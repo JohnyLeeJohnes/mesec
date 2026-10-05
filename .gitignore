@@ -1,0 +1,9 @@
+.vs/
+.idea/
+.claude/worktrees/
+# Zástupce vytváří install.cmd, obsahuje cesty platné jen na jednom počítači.
+*.lnk
+# Pojistka: data žijí v %APPDATA%\Mesec, ale kdyby je nebo zálohu někdo položil sem, do repozitáře nesmí.
+*.bin
+*.bin.new
+*.mesec
