@@ -26,24 +26,26 @@
 
 ## Instalace
 
-```
-git clone https://github.com/JohnyLeeJohnes/mesec.git
-```
+1. Stáhni **[Mesec.zip](https://github.com/JohnyLeeJohnes/mesec/releases/latest/download/Mesec.zip)**.
+   Odkaz vede vždycky na nejnovější vydání.
+2. Klikni na stažený ZIP pravým tlačítkem, zvol **Vlastnosti**, dole zaškrtni **Odblokovat** a potvrď.
+3. Rozbal ho tam, kde má Měšec zůstat, třeba do Dokumentů.
+4. Ve složce `Mesec` poklepej na **`install.cmd`**. Vytvoří zástupce **Měšec** s ikonou v nabídce Start,
+   na ploše a přímo ve složce. Přes něj se aplikace spouští jako každá jiná, bez okna konzole.
 
-Ve složce `mesec` pak poklepej na **`install.cmd`**. Vytvoří zástupce **Měšec** s ikonou
-v nabídce Start, na ploše a přímo ve složce. Přes něj se aplikace spouští jako každá jiná, bez okna konzole.
+> **Proč odblokovat?** Windows si soubory stažené z internetu označí a skripty s tímhle označením nemusí
+> spustit. Když ZIP odblokuješ ještě před rozbalením, označení se na rozbalené soubory nepřenese.
 
 - **Jen vyzkoušet:** poklepej na `Mesec.cmd`, spustí Měšec bez vytváření zástupců.
 - **Ukázka bez PINu a bez ukládání:** `powershell -ExecutionPolicy Bypass -File Mesec.ps1 -Demo`
+- **Nová verze:** stáhni ji stejně a rozbal přes tu starou. Data zůstanou, jsou uložená jinde.
 - **Přesunutí složky:** zástupce ukazuje tam, kde Měšec leží. Po přesunutí spusť `install.cmd` znovu.
 - **Odebrání:** smaž zástupce, složku s aplikací a data v `%APPDATA%\Mesec`.
+- **Z gitu:** `git clone https://github.com/JohnyLeeJohnes/mesec.git` a pak rovnou krok 4. Klonování
+  označení z internetu nepřidává, takže odblokování odpadá.
 
 Potřebuješ Windows 10 (1803 a novější) nebo 11; Windows PowerShell 5.1 je jejich součástí. Vyzkoušeno
 na Windows 11.
-
-> **Stahuješ ZIP místo `git clone`?** Windows si soubory stažené z internetu označí a skripty s tímhle
-> označením nemusí spustit. Před rozbalením proto klikni na ZIP pravým tlačítkem a zvol
-> **Vlastnosti → Odblokovat**.
 
 ## Jak se s tím pracuje
 
@@ -89,6 +91,7 @@ se nedostanou ani omylem; `.gitignore` navíc pro jistotu odmítá `*.bin` i zá
 | `Data.ps1` | Šifrování souboru a počítání nad rozpočtem. O okně nic neví. |
 | `Mesec.cmd`, `install.cmd` | Spuštění bez instalace a vytvoření zástupců. |
 | `tools/make-icon.ps1` | Vygeneruje ikonu do `assets/`. |
+| `tools/make-release.ps1` | Sestaví `dist/Mesec.zip` pro stránku Releases. |
 | `tests/test.ps1` | Zkouška šifrování, měsíců a průchod oknem. |
 
 Jiné typy plateb? Seznam `$categories` na začátku `Data.ps1`. Jiné barvy? Paleta na začátku `Mesec.xaml`.
@@ -115,5 +118,6 @@ powershell -ExecutionPolicy Bypass -File Mesec.ps1 -Demo -Screenshot docs\prehle
 recurring and one-off payments (amount, due day, recipient, category), tick them off as paid and see where
 the money goes. It unlocks with a four-digit PIN; the data file is AES-256 encrypted with a key derived from
 the PIN, wrapped in Windows DPAPI, and never leaves your machine. It is a PowerShell script with a WPF
-window: clone the repo and run `install.cmd` to get a shortcut, nothing to compile or install. The interface
+window: download [Mesec.zip](https://github.com/JohnyLeeJohnes/mesec/releases/latest/download/Mesec.zip),
+unblock and extract it, and run `install.cmd` to get a shortcut. Nothing to compile or install. The interface
 is in Czech.

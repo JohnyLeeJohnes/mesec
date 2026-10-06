@@ -3,6 +3,8 @@
 .claude/worktrees/
 # Zástupce vytváří install.cmd, obsahuje cesty platné jen na jednom počítači.
 *.lnk
+# ZIP pro GitHub Release sestavuje tools/make-release.ps1.
+dist/
 # Pojistka: data žijí v %APPDATA%\Mesec, ale kdyby je nebo zálohu někdo položil sem, do repozitáře nesmí.
 *.bin
 *.bin.new
