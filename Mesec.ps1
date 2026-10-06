@@ -10,6 +10,10 @@ $ErrorActionPreference = 'Stop'
 $icon = Join-Path $PSScriptRoot 'assets\mesec.ico'
 
 if ($Install) {
+    # Soubory rozbalené ze ZIPu staženého prohlížečem nesou značku "z internetu" a Windows se u nich
+    # může ptát nebo je odmítnout. Po instalaci už značku nemají. (Kde to nejde, zůstane vše při starém.)
+    Get-ChildItem -LiteralPath $PSScriptRoot -Recurse -File | Unblock-File -ErrorAction SilentlyContinue
+
     $shell = New-Object -ComObject WScript.Shell
     foreach ($directory in [Environment]::GetFolderPath('Programs'), [Environment]::GetFolderPath('DesktopDirectory'), $PSScriptRoot) {
         # WScript.Shell ukládá texty v kódové stránce systému a "ě" v ní být nemusí.

@@ -35,6 +35,7 @@
 
 > **Proč odblokovat?** Windows si soubory stažené z internetu označí a skripty s tímhle označením nemusí
 > spustit. Když ZIP odblokuješ ještě před rozbalením, označení se na rozbalené soubory nepřenese.
+> `install.cmd` ho ze souborů sundá i sám, jenže k tomu ho Windows nejdřív musí nechat spustit.
 
 - **Jen vyzkoušet:** poklepej na `Mesec.cmd`, spustí Měšec bez vytváření zástupců.
 - **Ukázka bez PINu a bez ukládání:** `powershell -ExecutionPolicy Bypass -File Mesec.ps1 -Demo`
