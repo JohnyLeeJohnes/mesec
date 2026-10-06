@@ -86,12 +86,12 @@ se nedostanou ani omylem; `.gitignore` navíc pro jistotu odmítá `*.bin` i zá
 | --- | --- |
 | `Mesec.ps1` | Okno: zámek s PINem, přehled měsíce, formulář položky, vytvoření zástupců. |
 | `Mesec.xaml` | Vzhled okna: barvy, styly, rozložení. |
-| `Budget.ps1` | Šifrování souboru a počítání nad rozpočtem. O okně nic neví. |
+| `Data.ps1` | Šifrování souboru a počítání nad rozpočtem. O okně nic neví. |
 | `Mesec.cmd`, `install.cmd` | Spuštění bez instalace a vytvoření zástupců. |
 | `tools/make-icon.ps1` | Vygeneruje ikonu do `assets/`. |
 | `tests/test.ps1` | Zkouška šifrování, měsíců a průchod oknem. |
 
-Jiné typy plateb? Seznam `$categories` na začátku `Budget.ps1`. Jiné barvy? Paleta na začátku `Mesec.xaml`.
+Jiné typy plateb? Seznam `$categories` na začátku `Data.ps1`. Jiné barvy? Paleta na začátku `Mesec.xaml`.
 Změny se projeví při dalším spuštění, nic se nesestavuje.
 
 Test se pouští takhle:

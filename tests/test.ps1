@@ -17,7 +17,7 @@ function Check($what, $actual, $expected) {
 }
 function Spaces([string]$text) { $text -replace ' ', ' ' }   # čeština odděluje tisíce pevnou mezerou
 
-. (Join-Path $root 'Budget.ps1')
+. (Join-Path $root 'Data.ps1')
 
 # ---- Soubory ----
 
@@ -29,34 +29,34 @@ foreach ($source in Get-ChildItem $root, "$root\tests", "$root\tools" -Filter *.
 
 # ---- Šifrování ----
 
-$data = New-Budget
+$data = New-Mesec
 Set-Entry $data '2026-01' @{ name = 'Nájem u paní Šťastné'; amount = 15000.5; day = 31; to = 'Pronajímatel'; cat = 'Bydlení'; monthly = $true }
 Set-Entry $data '2026-01' @{ name = 'Výplata'; amount = 50000; day = 10; to = ''; cat = $incomeCategory; monthly = $true }
 Set-Entry $data '2026-02' @{ name = 'Pračka'; amount = 9990; day = 14; to = ''; cat = 'Bydlení'; monthly = $false }
 
 $key = New-Key '1234'
-$vault = Protect-Budget $key $data
-$opened = Unprotect-Budget $vault '1234'
+$vault = Protect-Mesec $key $data
+$opened = Unprotect-Mesec $vault '1234'
 $rent = $opened.Data.items | Where-Object { $_.day -eq 31 }
 Check 'správný PIN trezor otevře' $opened.Data.items.Count 3
 Check 'čeština a haléře cestu přežijí' "$($rent.name) $($rent.amount)" 'Nájem u paní Šťastné 15000.5'
-Check 'špatný PIN ho neotevře' ($null -eq (Unprotect-Budget $vault '1235')) $true
+Check 'špatný PIN ho neotevře' ($null -eq (Unprotect-Mesec $vault '1235')) $true
 Check 'v trezoru není nic čitelného' ([Text.Encoding]::UTF8.GetString($vault) -match 'Nájem|Bydlení|amount') $false
-Check 'každé uložení má jiný IV' ([Convert]::ToBase64String((Protect-Budget $key $data)) -eq [Convert]::ToBase64String($vault)) $false
+Check 'každé uložení má jiný IV' ([Convert]::ToBase64String((Protect-Mesec $key $data)) -eq [Convert]::ToBase64String($vault)) $false
 $broken = [byte[]]$vault.Clone()
 $broken[60] = $broken[60] -bxor 1
-Check 'pozměněný trezor neprojde' ($null -eq (Unprotect-Budget $broken '1234')) $true
+Check 'pozměněný trezor neprojde' ($null -eq (Unprotect-Mesec $broken '1234')) $true
 
 $file = Join-Path $temp 'data.bin'
-Save-Budget $file $key $data
-Save-Budget $file $key $data   # podruhé už se přepisuje existující soubor
+Save-Mesec $file $key $data
+Save-Mesec $file $key $data   # podruhé už se přepisuje existující soubor
 Check 'soubor na disku je navíc zabalený v DPAPI' (Test-Vault ([IO.File]::ReadAllBytes($file))) $false
 Check 'po uložení nezbyde rozepsaný soubor' (Test-Path "$file.new") $false
-$opened = Open-Budget $file '1234'
-Check 'Open-Budget přečte, co Save-Budget uložil' "$($opened.Data.items.Count) $($opened.Backup)" '3 False'
-Check 'Open-Budget se špatným PINem' ($null -eq (Open-Budget $file '0000')) $true
+$opened = Open-Mesec $file '1234'
+Check 'Open-Mesec přečte, co Save-Mesec uložil' "$($opened.Data.items.Count) $($opened.Backup)" '3 False'
+Check 'Open-Mesec se špatným PINem' ($null -eq (Open-Mesec $file '0000')) $true
 [IO.File]::WriteAllBytes($file, $vault)
-Check 'záloha položená na místo dat jde otevřít' (Open-Budget $file '1234').Backup $true
+Check 'záloha položená na místo dat jde otevřít' (Open-Mesec $file '1234').Backup $true
 
 # ---- Měsíce ----
 
@@ -77,7 +77,7 @@ Remove-Entry $data '2026-05' $rent.id
 Check 'smazání od května nechá duben' "$((Get-Summary $data '2026-04').Expenses) $((Get-Summary $data '2026-05').Expenses)" '16500 0'
 Check 'příjem se mezi výdaje nepočítá' (Get-Summary $data '2026-05').Income 50000
 Check 'rok má dvanáct měsíců' "$(@(Get-Year $data 2026).Count) $((Get-Year $data 2026)[1].Expenses)" '12 24990.5'
-Check 'typy od největšího' ((Get-Breakdown (New-DemoBudget) (Get-MonthKey ([DateTime]::Today)))[0].Name) 'Bydlení'
+Check 'typy od největšího' ((Get-Breakdown (New-DemoMesec) (Get-MonthKey ([DateTime]::Today)))[0].Name) 'Bydlení'
 
 Check 'částka s mezerou a čárkou' (ConvertTo-Amount '1 499,90') '1499.90'
 Check 'nejasná částka 1.500 neprojde' ($null -eq (ConvertTo-Amount '1.500')) $true

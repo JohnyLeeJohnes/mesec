@@ -43,8 +43,8 @@ function New-Key([string]$pin, [byte[]]$salt, [int]$rounds = $kdfRounds) {
     }
 }
 
-# Rozpočet zašifrovaný jen PINem. Takhle vypadá záloha; Save-Budget kolem toho přidává DPAPI.
-function Protect-Budget($key, $data) {
+# Rozpočet zašifrovaný jen PINem. Takhle vypadá záloha; Save-Mesec kolem toho přidává DPAPI.
+function Protect-Mesec($key, $data) {
     $aes = [Security.Cryptography.Aes]::Create()   # AES-256-CBC s novým náhodným IV
     $aes.Key = $key.Enc
     $plain = [Text.Encoding]::UTF8.GetBytes((ConvertTo-Json -Compress -Depth 4 -InputObject $data))
@@ -55,7 +55,7 @@ function Protect-Budget($key, $data) {
 }
 
 # Vrací @{ Key; Data }, při špatném PINu $null. PIN se nikde neukládá: pozná se podle toho, že sedí HMAC.
-function Unprotect-Budget([byte[]]$vault, [string]$pin) {
+function Unprotect-Mesec([byte[]]$vault, [string]$pin) {
     $rounds = if (Test-Vault $vault) { [BitConverter]::ToInt32($vault, $magic.Length) } else { 0 }
     # Horní mez: podvržený soubor nesmí okno zaseknout na hodiny odvozováním klíče.
     if ($rounds -lt 1 -or $rounds -gt 5000000) { throw 'Soubor s daty je poškozený.' }
@@ -73,12 +73,12 @@ function Unprotect-Budget([byte[]]$vault, [string]$pin) {
     $aes.IV = [byte[]]$vault[26..41]
     $plain = $aes.CreateDecryptor().TransformFinalBlock($vault, $headerLength, $bodyLength - $headerLength)
     $aes.Dispose()
-    @{ Key = $key; Data = ConvertFrom-BudgetJson ([Text.Encoding]::UTF8.GetString($plain)) }
+    @{ Key = $key; Data = ConvertFrom-MesecJson ([Text.Encoding]::UTF8.GetString($plain)) }
 }
 
-function Save-Budget([string]$path, $key, $data) {
+function Save-Mesec([string]$path, $key, $data) {
     $null = New-Item -ItemType Directory -Force (Split-Path $path)
-    $bytes = [Security.Cryptography.ProtectedData]::Protect((Protect-Budget $key $data), $null, 'CurrentUser')
+    $bytes = [Security.Cryptography.ProtectedData]::Protect((Protect-Mesec $key $data), $null, 'CurrentUser')
     # Nejdřív vedle a pak vyměnit: pád uprostřed zápisu nesmí o data připravit.
     [IO.File]::WriteAllBytes("$path.new", $bytes)
     if (Test-Path -LiteralPath $path) { [IO.File]::Replace("$path.new", $path, [NullString]::Value) }
@@ -86,14 +86,14 @@ function Save-Budget([string]$path, $key, $data) {
 }
 
 # Vrací @{ Key; Data; Backup }, při špatném PINu $null. Backup = soubor byl záloha bez DPAPI.
-function Open-Budget([string]$path, [string]$pin) {
+function Open-Mesec([string]$path, [string]$pin) {
     $bytes = [IO.File]::ReadAllBytes($path)
     $backup = Test-Vault $bytes
     if (-not $backup) {
         try { $bytes = [Security.Cryptography.ProtectedData]::Unprotect($bytes, $null, 'CurrentUser') }
         catch { throw 'Data patří jinému účtu Windows, nebo jsou poškozená. Pomůže jen obnova ze zálohy.' }
     }
-    $opened = Unprotect-Budget $bytes $pin
+    $opened = Unprotect-Mesec $bytes $pin
     if ($opened) { $opened.Backup = $backup }
     $opened
 }
@@ -104,10 +104,10 @@ function Open-Budget([string]$path, [string]$pin) {
 # Změna opakované platby založí od daného měsíce novou verzi se stejným id, takže starší měsíce zůstanou.
 # paid: 'yyyy-MM|id' za každou zaplacenou platbu.
 
-function New-Budget { @{ items = @(); paid = @() } }
+function New-Mesec { @{ items = @(); paid = @() } }
 
 # Co přijde ze souboru, srovná do známých typů; cokoli navíc zahodí.
-function ConvertFrom-BudgetJson([string]$json) {
+function ConvertFrom-MesecJson([string]$json) {
     $raw = ConvertFrom-Json $json
     @{
         items = @(foreach ($item in $raw.items) {
@@ -226,9 +226,9 @@ function Remove-Entry($data, [string]$month, [string]$id) {
 
 # ---- Ukázka ----
 # Vymyšlený rozpočet živnostníka za poslední rok, počítaný od dneška, aby nezestárl.
-function New-DemoBudget {
+function New-DemoMesec {
     $now = Get-MonthKey ([DateTime]::Today)
-    $data = New-Budget
+    $data = New-Mesec
     # název, částka, den, kam, typ, začátek (před kolika měsíci), konec ('' = běží dál)
     $rows = @(
         @('Faktury', 74000, 10, 'Klienti', $incomeCategory, 14, 6),

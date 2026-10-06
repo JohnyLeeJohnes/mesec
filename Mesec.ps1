@@ -1,4 +1,4 @@
-﻿# Měšec: měsíční rozpočet pod PINem. Okno je popsané v Mesec.xaml, šifrování a počítání v Budget.ps1.
+﻿# Měšec: měsíční rozpočet pod PINem. Okno je popsané v Mesec.xaml, šifrování a počítání v Data.ps1.
 #   Mesec.ps1                       spustí aplikaci
 #   Mesec.ps1 -Install              vytvoří zástupce s ikonou v nabídce Start, na ploše a ve složce s Měšcem
 #   Mesec.ps1 -Demo                 ukázková data bez PINu; na disk se nic neukládá
@@ -34,7 +34,7 @@ if ($Install) {
 }
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
-. (Join-Path $PSScriptRoot 'Budget.ps1')
+. (Join-Path $PSScriptRoot 'Data.ps1')
 
 # Když se Add-Type nepovede (třeba kvůli zásadám počítače), Měšec běží dál, jen má světlý titulek.
 $native = $null
@@ -127,7 +127,7 @@ function Add-Digit([string]$digit) {
 function Enter-Pin([string]$pin) {
     try {
         if ($state.Mode -eq 'Unlock') {
-            $opened = Open-Budget $dataFile $pin
+            $opened = Open-Mesec $dataFile $pin
             if (-not $opened) { Show-LockError 'Špatný PIN.'; return }
             $state.Key = $opened.Key
             $state.Data = $opened.Data
@@ -142,7 +142,7 @@ function Enter-Pin([string]$pin) {
         }
         else {
             $state.Key = New-Key $pin
-            if (-not $state.Data) { $state.Data = New-Budget }
+            if (-not $state.Data) { $state.Data = New-Mesec }
             Save-State
         }
         Show-Main
@@ -152,7 +152,7 @@ function Enter-Pin([string]$pin) {
 
 function Save-State {
     if ($Demo) { return }   # ukázka na disk nesahá
-    try { Save-Budget $dataFile $state.Key $state.Data }
+    try { Save-Mesec $dataFile $state.Key $state.Data }
     catch { $null = [Windows.MessageBox]::Show("Uložení se nepovedlo: $_", 'Měšec', 'OK', 'Error') }
 }
 
@@ -165,7 +165,7 @@ function Get-Stars([decimal]$part, [decimal]$whole) {
 }
 
 function Update-View {
-    $data = if ($state.Data) { $state.Data } else { New-Budget }
+    $data = if ($state.Data) { $state.Data } else { New-Mesec }
     $month = $state.Month
     $summary = Get-Summary $data $month
     $left = $summary.Income - $summary.Expenses
@@ -403,7 +403,7 @@ try {
         $dialog.FileName = "mesec-$([DateTime]::Today.ToString('yyyy-MM-dd')).mesec"
         if (-not $dialog.ShowDialog($window)) { return }
         try {
-            [IO.File]::WriteAllBytes($dialog.FileName, (Protect-Budget $state.Key $state.Data))
+            [IO.File]::WriteAllBytes($dialog.FileName, (Protect-Mesec $state.Key $state.Data))
             $text = "Záloha je uložená. Otevřeš ji stejným PINem jako teď.`n`nChrání ji jen ten PIN, takže ji nenechávej na sdíleném disku ani v cloudu."
             $null = [Windows.MessageBox]::Show($text, 'Měšec', 'OK', 'Information')
         }
@@ -466,7 +466,7 @@ try {
     if ($Demo) {
         $window.Title = 'Měšec (ukázka)'
         $ui.VaultButtons.Visibility = 'Collapsed'
-        $state.Data = New-DemoBudget
+        $state.Data = New-DemoMesec
         Show-Main
     }
     elseif (Test-Path -LiteralPath $dataFile) { Show-Lock 'Unlock' }
