@@ -27,10 +27,10 @@
 ## Instalace
 
 ```
-git clone https://github.com/JohnyLeeJohnes/BudgetManagement.git
+git clone https://github.com/JohnyLeeJohnes/mesec.git
 ```
 
-Ve složce `BudgetManagement` pak poklepej na **`install.cmd`**. Vytvoří zástupce **Měšec** s ikonou
+Ve složce `mesec` pak poklepej na **`install.cmd`**. Vytvoří zástupce **Měšec** s ikonou
 v nabídce Start, na ploše a přímo ve složce. Přes něj se aplikace spouští jako každá jiná, bez okna konzole.
 
 - **Jen vyzkoušet:** poklepej na `Mesec.cmd`, spustí Měšec bez vytváření zástupců.
