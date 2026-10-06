@@ -92,7 +92,8 @@ se nedostanou ani omylem; `.gitignore` navíc pro jistotu odmítá `*.bin` i zá
 | `tests/test.ps1` | Zkouška šifrování, měsíců a průchod oknem. |
 
 Jiné typy plateb? Seznam `$categories` na začátku `Data.ps1`. Jiné barvy? Paleta na začátku `Mesec.xaml`.
-Změny se projeví při dalším spuštění, nic se nesestavuje.
+Změny se projeví při dalším spuštění, nic se nesestavuje. Co se ve které verzi změnilo, je
+v [CHANGELOG.md](CHANGELOG.md).
 
 Test se pouští takhle:
 
