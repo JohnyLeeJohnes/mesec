@@ -397,11 +397,21 @@
                             ToolTip="Další měsíc" AutomationProperties.Name="Další měsíc"/>
                     <Button x:Name="TodayButton" Style="{StaticResource QuietButton}" Content="Tento měsíc" Margin="12,0,0,0"/>
                 </StackPanel>
-                <StackPanel x:Name="VaultButtons" Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button x:Name="BackupButton" Style="{StaticResource QuietButton}" Content="Záloha"
-                            ToolTip="Uloží zašifrovanou kopii dat do souboru. Hodí se před přeinstalací Windows."/>
-                    <Button x:Name="PinButton" Style="{StaticResource QuietButton}" Content="Změnit PIN" Margin="8,0"/>
-                    <Button x:Name="LockButton" Style="{StaticResource QuietButton}" Content="Zamknout"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <StackPanel x:Name="VaultButtons" Orientation="Horizontal">
+                        <Button x:Name="BackupButton" Style="{StaticResource QuietButton}" Content="Záloha"
+                                ToolTip="Uloží zašifrovanou kopii dat do souboru. Hodí se před přeinstalací Windows."/>
+                        <Button x:Name="PinButton" Style="{StaticResource QuietButton}" Content="Změnit PIN" Margin="8,0"/>
+                        <Button x:Name="LockButton" Style="{StaticResource QuietButton}" Content="Zamknout"/>
+                    </StackPanel>
+                    <!-- Jen když Měšec pustila Bránocesta; ukazuje ho Mesec.ps1. Stojí mimo VaultButtons, ať je vidět i v ukázce. -->
+                    <Button x:Name="GatewayButton" Style="{StaticResource QuietButton}" Margin="8,0,0,0" Visibility="Collapsed"
+                            ToolTip="Zavře Měšec a otevře Bránocestu." AutomationProperties.Name="Zpět na Bránocestu">
+                        <TextBlock>
+                            <Run FontFamily="Segoe MDL2 Assets" FontSize="10" Text="&#xE72B;"/>
+                            <Run Text=" Bránocesta"/>
+                        </TextBlock>
+                    </Button>
                 </StackPanel>
             </Grid>
 
@@ -699,6 +709,15 @@
                            MinHeight="34" Margin="0,24,0,0"/>
                 <Button x:Name="RestoreButton" Style="{StaticResource QuietButton}" Content="Obnovit ze zálohy…"
                         HorizontalAlignment="Center" Margin="0,10,0,0"/>
+                <!-- Zpátky do brány jde i bez PINu. -->
+                <Button x:Name="LockGatewayButton" Style="{StaticResource QuietButton}" HorizontalAlignment="Center"
+                        Margin="0,10,0,0" Visibility="Collapsed" ToolTip="Zavře Měšec a otevře Bránocestu."
+                        AutomationProperties.Name="Zpět na Bránocestu">
+                    <TextBlock>
+                        <Run FontFamily="Segoe MDL2 Assets" FontSize="10" Text="&#xE72B;"/>
+                        <Run Text=" Bránocesta"/>
+                    </TextBlock>
+                </Button>
             </StackPanel>
         </Grid>
 
