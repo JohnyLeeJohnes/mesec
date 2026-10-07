@@ -30,9 +30,9 @@ foreach ($source in Get-ChildItem $root, "$root\tests", "$root\tools" -Filter *.
 # ---- Šifrování ----
 
 $data = New-Mesec
-Set-Entry $data '2026-01' @{ name = 'Nájem u paní Šťastné'; amount = 15000.5; day = 31; to = 'Pronajímatel'; cat = 'Bydlení'; monthly = $true }
-Set-Entry $data '2026-01' @{ name = 'Výplata'; amount = 50000; day = 10; to = ''; cat = $incomeCategory; monthly = $true }
-Set-Entry $data '2026-02' @{ name = 'Pračka'; amount = 9990; day = 14; to = ''; cat = 'Bydlení'; monthly = $false }
+Set-Entry $data '2026-01' @{ name = 'Nájem u paní Šťastné'; amount = 15000.5; day = 31; to = 'Pronajímatel'; cat = 'Bydlení'; until = '' }
+Set-Entry $data '2026-01' @{ name = 'Výplata'; amount = 50000; day = 10; to = ''; cat = $incomeCategory; until = '' }
+Set-Entry $data '2026-02' @{ name = 'Splátka pračky'; amount = 9990; day = 14; to = ''; cat = 'Splátky'; until = '2026-03' }
 
 $key = New-Key '1234'
 $vault = Protect-Mesec $key $data
@@ -60,31 +60,44 @@ Check 'záloha položená na místo dat jde otevřít' (Open-Mesec $file '1234')
 
 # ---- Měsíce ----
 
-Check 'opakované položky jsou v každém měsíci' "$(@(Get-MonthItems $data '2026-01').Count) $(@(Get-MonthItems $data '2026-03').Count)" '2 2'
-Check 'jednorázová jen ve svém' (@(Get-MonthItems $data '2026-02').Count) 3
+function Spent([string[]]$months) { "$(foreach ($month in $months) { (Get-Summary $data $month).Expenses })" }
+
+Check 'platba bez konce je v každém dalším měsíci' "$(@(Get-MonthItems $data '2026-01').Count) $(@(Get-MonthItems $data '2031-07').Count)" '2 2'
+Check 'platba s koncem je vidět jen do něj' "$(@(Get-MonthItems $data '2026-02').Count) $(@(Get-MonthItems $data '2026-03').Count) $(@(Get-MonthItems $data '2026-04').Count)" '3 3 2'
 Check 'před začátkem nic není' (@(Get-MonthItems $data '2025-12').Count) 0
 
-$rent = Get-MonthItems $data '2026-03' | Where-Object { $_.cat -eq 'Bydlení' }
-Set-Entry $data '2026-03' @{ id = $rent.id; name = 'Nájem'; amount = 16000; day = 31; to = ''; cat = 'Bydlení'; monthly = $true }
-Check 'zdražení od března nepřepíše únor' "$((Get-Summary $data '2026-02').Expenses) $((Get-Summary $data '2026-03').Expenses)" '24990.5 16000'
+$rent = (Get-MonthItems $data '2026-03' | Where-Object { $_.cat -eq 'Bydlení' }).id
+Set-Entry $data '2026-03' @{ id = $rent; name = 'Nájem'; amount = 16000; day = 31; to = ''; cat = 'Bydlení'; until = '' }
+Check 'zdražení od března nepřepíše únor' (Spent '2026-02', '2026-03', '2026-04') '24990.5 25990 16000'
+Set-Entry $data '2026-03' @{ id = $rent; name = 'Nájem'; amount = 16500; day = 31; to = ''; cat = 'Bydlení'; until = '2026-12' }
+Check 'druhá úprava v témže měsíci verzi nahradí' "$($data.items.Count) $(Spent '2026-03')" '4 26490'
+Check 'konec platí pro celou platbu' "$(Get-EntryEnd $data $rent) $(Spent '2026-12', '2027-01')" '2026-12 16500 0'
 
-Set-Paid $data '2026-03' $rent.id $true
-Check 'zaplaceno platí jen pro svůj měsíc' "$((Get-Summary $data '2026-03').Unpaid) $((Get-Summary $data '2026-04').Unpaid)" '0 16000'
-Set-Entry $data '2026-03' @{ id = $rent.id; name = 'Nájem'; amount = 16500; day = 31; to = ''; cat = 'Bydlení'; monthly = $true }
-Check 'úprava nechá platbu zaplacenou' "$(Test-Paid $data '2026-03' $rent.id) $((Get-Summary $data '2026-03').Expenses)" 'True 16500'
+Skip-Entry $data '2026-05' $rent
+Check 'smazání jen pro květen nechá duben i červen' (Spent '2026-04', '2026-05', '2026-06') '16500 0 16500'
+Set-Entry $data '2026-04' @{ id = $rent; name = 'Nájem'; amount = 17000; day = 31; to = ''; cat = 'Bydlení'; until = '' }
+Check 'pozdější úprava vynechaný květen nevrátí' "$(Spent '2026-05', '2026-06', '2027-01') [$(Get-EntryEnd $data $rent)]" '0 17000 17000 []'
 
-Remove-Entry $data '2026-05' $rent.id
-Check 'smazání od května nechá duben' "$((Get-Summary $data '2026-04').Expenses) $((Get-Summary $data '2026-05').Expenses)" '16500 0'
+Remove-Entry $data '2026-07' $rent
+Check 'smazání od července nechá červen' "$(Spent '2026-06', '2026-07') $(Get-EntryEnd $data $rent)" '17000 0 2026-06'
+Set-Entry $data '2026-02' @{ id = $rent; name = 'Nájem'; amount = 15500; day = 31; to = ''; cat = 'Bydlení'; until = '2026-04' }
+Check 'změna v únoru platí i pro pozdější verze' (Spent '2026-01', '2026-02', '2026-04', '2026-05') '15000.5 25490 15500 0'
+
 Check 'příjem se mezi výdaje nepočítá' (Get-Summary $data '2026-05').Income 50000
-Check 'rok má dvanáct měsíců' "$(@(Get-Year $data 2026).Count) $((Get-Year $data 2026)[1].Expenses)" '12 24990.5'
+Check 'rok má dvanáct měsíců' "$(@(Get-Year $data 2026).Count) $((Get-Year $data 2026)[1].Month) $((Get-Year $data 2026)[1].Expenses)" '12 2026-02 25490'
 Check 'typy od největšího' ((Get-Breakdown (New-DemoMesec) (Get-MonthKey ([DateTime]::Today)))[0].Name) 'Bydlení'
+
+# Soubor z verze, která znala zaškrtávání a jednorázové položky.
+$legacy = ConvertFrom-MesecJson '{"items":[{"id":"a","name":"Dárek","amount":1500,"day":22,"to":"","cat":"Ostatní","from":"2026-01","until":"2026-01"}],"paid":["2026-01|a"]}'
+Check 'starší data: zaškrtnutí se zahodí' "$($legacy.skipped.Count) $($legacy.ContainsKey('paid'))" '0 False'
+Check 'starší data: jednorázová položka je platba, která končí hned' "$(@(Get-MonthItems $legacy '2026-01').Count) $(@(Get-MonthItems $legacy '2026-02').Count)" '1 0'
 
 Check 'částka s mezerou a čárkou' (ConvertTo-Amount '1 499,90') '1499.90'
 Check 'nejasná částka 1.500 neprojde' ($null -eq (ConvertTo-Amount '1.500')) $true
 Check 'nula ani text neprojdou' "$($null -eq (ConvertTo-Amount '0')) $($null -eq (ConvertTo-Amount 'hodně'))" 'True True'
-Check 'splatnost 31. je v únoru 28.' (Get-DueDate '2026-02' 31).ToString('yyyy-MM-dd') '2026-02-28'
 Check 'peníze česky' (Spaces (Format-Money 15000.5)) '15 000,50 Kč'
 Check 'název měsíce' (Format-Month '2026-10') 'Říjen 2026'
+Check 'konec platby česky' (Format-Until '2026-10') 'do října 2026'
 Check 'leden minus jedna je loňský prosinec' (Add-Month '2026-01' -1) '2025-12'
 
 # ---- Okno ----
@@ -116,14 +129,18 @@ $walk = {
     Click $ui.SaveButton
     Check 'nesmyslná částka se neuloží' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count)" 'True 0'
     $ui.AmountBox.Text = '15 000'
-    $ui.DayBox.Text = '5'
+    $days = @($ui.PickerDays.Children)
+    Click $ui.DayButton
+    Check 'vybírátko dne se otevře na dnešku' "$($ui.DayPicker.IsOpen) $($days.Count) $(($days | Where-Object { $_.IsChecked }).Tag)" "True 31 $([DateTime]::Today.Day)"
+    Press 'Return'
+    Check 'Enter nad otevřeným vybírátkem formulář neuloží' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count)" 'True 0'
+    Click $days[4]
+    Check 'kliknutí na den ho nastaví' "$($ui.DayPicker.IsOpen) $($ui.DayButton.Content)" 'False 5.'
     ($ui.Categories.Children | Where-Object { $_.Content -eq 'Bydlení' }).IsChecked = $true
     Press 'Return'
-    Check 'Enter položku uloží' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count) $(Spaces $ui.ExpensesText.Text)" 'False 1 15 000 Kč'
+    Check 'Enter položku uloží' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count) $($ui.Rows.Items[0].Day) $(Spaces $ui.ExpensesText.Text)" 'False 1 5. 15 000 Kč'
     Check 'typ se propíše do grafu' "$($ui.Breakdown.Items[0].Name) $($ui.Breakdown.Items[0].Share)" 'Bydlení 100 %'
-
-    Switch-Paid $ui.Rows.Items[0] $true
-    Check 'kolečko platbu zaplatí' "$($ui.PaidText.Text), zbývá $($ui.UnpaidText.Text)" 'zaplaceno 1 z 1, zbývá 0 Kč'
+    Check 'platba bez konce nemá poznámku' "[$($ui.Rows.Items[0].Note)]" '[]'
 
     Click $ui.LockButton
     Check 'zamknutí schová přehled a zahodí data z paměti' "$(Shown $ui.LockView) $(Shown $ui.MainView) $($null -eq $state.Data) $($ui.Rows.Items.Count)" 'True False True 0'
@@ -132,17 +149,62 @@ $walk = {
     Press 'D7'
     Press 'Back'
     Enter '1234'
-    Check 'správný PIN vrátí uložená data' "$(Shown $ui.MainView) $($ui.Rows.Items.Count) $($ui.PaidText.Text)" 'True 1 zaplaceno 1 z 1'
+    Check 'správný PIN vrátí uložená data' "$(Shown $ui.MainView) $($ui.Rows.Items.Count)" 'True 1'
 
+    # Měsíce: 0 = dnešní, 1 a 2 = další dva.
+    $next = Add-Month $state.Month 1
     Click $ui.NextButton
-    Check 'další měsíc: platba se opakuje, zaplacená ještě není' "$($ui.Rows.Items.Count) $($ui.PaidText.Text)" '1 zaplaceno 0 z 1'
+    Check 'další měsíc: platba je tam taky' $ui.Rows.Items.Count 1
+
+    Open-Editor $ui.Rows.Items[0]
+    Check 'u platby je nejdřív jen Smazat' "$(Shown $ui.DeleteButton) $(Shown $ui.DeleteChoices)" 'True False'
+    Click $ui.DeleteButton
+    Check 'Smazat se zeptá, co smazat' "$(Shown $ui.DeleteButton) $(Shown $ui.DeleteChoices) $($ui.Rows.Items.Count)" 'False True 1'
+    Click $ui.DeleteMonthButton
+    Check 'smazání jen pro měsíc ho vyprázdní' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count)" 'False 0'
+    Click $ui.NextButton
+    Check 'a v dalším měsíci platba zase je' $ui.Rows.Items.Count 1
 
     Open-Editor $ui.Rows.Items[0]
     Click $ui.DeleteButton
-    Check 'první Smazat se jen zeptá' "$($ui.DeleteButton.Content) $($ui.Rows.Items.Count)" 'Opravdu smazat? 1'
-    Click $ui.DeleteButton
+    Click $ui.DeleteOnwardButton
+    Click $ui.NextButton
+    Check 'smazání od měsíce dál platí i pro ty další' $ui.Rows.Items.Count 0
+    Click $ui.TodayButton
+    Check 'starší měsíce po smazání zůstanou a ukazují konec' "$($ui.Rows.Items.Count) $($ui.Rows.Items[0].Note)" "1 $(Format-Until $next)"
+
+    # Vybírátko měsíce: konec platby se nepíše, volí se.
+    $shown = Get-MonthStart $state.Month
+    $chips = @($ui.PickerMonths.Children)
+    Open-Editor $ui.Rows.Items[0]
+    Check 'formulář ukáže konec platby' $ui.UntilButton.Content (Format-Month $next)
+    Click $ui.UntilButton
+    Check 'vybírátko se otevře na konci platby' "$($ui.MonthPicker.IsOpen) $($ui.PickerYear.Text) $(($chips | Where-Object { $_.IsChecked }).Tag)" "True $((Get-MonthStart $next).Year) $((Get-MonthStart $next).Month)"
+    if ($state.Pick.Year -gt $shown.Year) { Click $ui.PickerPrevYear }
+    Check 'měsíce před zobrazeným zvolit nejdou' "$(@($chips | Where-Object { $_.IsEnabled }).Count) $($ui.PickerPrevYear.IsEnabled)" "$(13 - $shown.Month) False"
+    Press 'Escape'
+    Check 'Esc zavře vybírátko, formulář nechá' "$($ui.MonthPicker.IsOpen) $(Shown $ui.EditorView) $($ui.UntilButton.Content)" "False True $(Format-Month $next)"
+    Click $ui.UntilButton
+    Click $ui.PickerNextYear
+    Click $chips[5]
+    Check 'kliknutí na měsíc nastaví konec' "$($ui.MonthPicker.IsOpen) $($ui.UntilButton.Content)" "False Červen $((Get-MonthStart $next).Year + 1)"
+    Click $ui.UntilButton
+    Click $ui.PickerClearButton
+    Check 'konec jde zase zrušit' $ui.UntilButton.Content 'Bez omezení'
+    Press 'Return'
+    Click $ui.NextButton
+    Click $ui.NextButton
+    Check 'platba bez konce běží dál' "$(Shown $ui.EditorView) $($ui.Rows.Items.Count)" 'False 1'
     Click $ui.PrevButton
-    Check 'smazání od dalšího měsíce nechá ten předchozí' "$($state.Data.items.Count) $($ui.Rows.Items.Count)" '1 1'
+    Check 'jen vynechaný měsíc zůstává prázdný' $ui.Rows.Items.Count 0
+
+    Click $ui.TodayButton
+    Click $ui.MonthButton
+    Check 'v záhlaví se měsíc jen volí, zrušit nejde' "$(Shown $ui.PickerClearButton) $(@($chips | Where-Object { $_.IsEnabled }).Count)" 'False 12'
+    Click $ui.PickerPrevYear
+    Click $chips[0]
+    Check 'vybírátko v záhlaví přejde na zvolený měsíc' "$($state.Month) $($ui.MonthText.Text)" "$($shown.Year - 1)-01 Leden $($shown.Year - 1)"
+    Click $ui.TodayButton
 
     Click $ui.PinButton
     Enter '4321'

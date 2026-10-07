@@ -5,7 +5,7 @@
 <h1 align="center">Měšec</h1>
 
 <p align="center">
-  Měsíční rozpočet pod PINem. Výdaje, splatnosti a grafy, všechno jen u tebe na disku a zašifrované.
+  Měsíční rozpočet pod PINem. Pravidelné platby a grafy, všechno jen u tebe na disku a zašifrované.
 </p>
 
 <p align="center">
@@ -16,11 +16,11 @@
   potřebuje, už ve Windows je.
 - **PIN jako ve Windows.** Při prvním spuštění si zvolíš čtyři číslice, příště je jen napíšeš. Enter není
   potřeba a na české klávesnici ani Shift.
-- **Platby se vším všudy:** název, částka, den splatnosti, kam to jde a typ (bydlení, energie, zdravotní
-  a sociální pojištění, daně, penzijko, investice, spoření, splátky, předplatné…). Opakované každý měsíc,
-  nebo jednorázové.
-- **Přehled měsíce:** příjmy, výdaje, kolik zbývá a kolik je ještě potřeba zaplatit. Rozpis je seřazený
-  podle splatnosti, zaplacené si odškrtáváš a co je po splatnosti, zčervená.
+- **Jen pravidelné platby:** název, částka, kolikátého v měsíci se platí, příjemce a typ (bydlení,
+  energie, zdravotní a sociální pojištění, daně, penzijko, investice, spoření, splátky, předplatné…).
+  Platba běží každý měsíc bez omezení, nebo jen do měsíce a roku, který jí určíš.
+- **Přehled měsíce:** příjmy, výdaje a kolik zbývá. Rozpis je seřazený podle dne v měsíci a nic se
+  v něm neodškrtává.
 - **Grafy:** kam jdou peníze podle typu a výdaje po měsících celého roku, včetně těch, které teprve přijdou.
 - **Data nikam neodcházejí.** Jeden zašifrovaný soubor ve tvém profilu Windows, žádný server, žádný účet.
 
@@ -58,12 +58,19 @@ na Windows 11.
 </p>
 
 1. Při prvním spuštění napiš čtyřmístný PIN a pak ještě jednou pro kontrolu.
-2. **+ Přidat** založí platbu. Příjem je položka s typem **Příjem**.
-3. Kolečkem vlevo platbu odškrtneš jako zaplacenou, kliknutím na řádek ji upravíš nebo smažeš.
-4. Šipkami nahoře (nebo kliknutím na sloupec v grafu) přecházíš mezi měsíci.
+2. **+ Přidat** založí pravidelnou platbu od zobrazeného měsíce. Příjem je platba s typem **Příjem**.
+3. Kliknutím na řádek platbu upravíš nebo smažeš.
+4. Mezi měsíci přecházíš šipkami nahoře nebo kliknutím na sloupec v grafu. Kliknutí na název měsíce
+   otevře vybírátko měsíce a roku, kterým přeskočíš rovnou kamkoli.
 
-Opakovaná platba se sama objeví v každém dalším měsíci. Když ji změníš nebo smažeš, platí to **od
-zobrazeného měsíce dál**; starší měsíce zůstanou, jak byly, takže zdražení nájmu nepřepíše historii.
+Platba se sama objeví v každém dalším měsíci. Když má skončit, zvol ve formuláři u **Platí do** měsíc a rok
+poslední platby; jinak běží bez omezení. Den, měsíc ani rok se nikde nepíšou, vždycky se volí ve vybírátku.
+U roku stačí šipku podržet a roky běží samy.
+
+- **Změna** platí od zobrazeného měsíce dál. Starší měsíce zůstanou, jak byly, takže zdražení nájmu
+  nepřepíše historii.
+- **Smazat** se zeptá: **Jen tenhle měsíc** platbu vynechá jednou a příště je zase na místě,
+  **I všechny další** ji ukončí od zobrazeného měsíce dál.
 
 ## Kde jsou data a jak jsou chráněná
 
@@ -90,7 +97,7 @@ se nedostanou ani omylem; `.gitignore` navíc pro jistotu odmítá `*.bin` i zá
 
 | Soubor | Obsah |
 | --- | --- |
-| `Mesec.ps1` | Okno: zámek s PINem, přehled měsíce, formulář položky, vytvoření zástupců. |
+| `Mesec.ps1` | Okno: zámek s PINem, přehled měsíce, formulář platby, vytvoření zástupců. |
 | `Mesec.xaml` | Vzhled okna: barvy, styly, rozložení. |
 | `Data.ps1` | Šifrování souboru a počítání nad rozpočtem. O okně nic neví. |
 | `Mesec.cmd`, `install.cmd` | Spuštění bez instalace a vytvoření zástupců. |
@@ -119,8 +126,8 @@ powershell -ExecutionPolicy Bypass -File Mesec.ps1 -Demo -Screenshot docs\prehle
 ---
 
 **In English:** Měšec ("the purse") is a small monthly budget tracker for Windows 10/11. You enter your
-recurring and one-off payments (amount, due day, recipient, category), tick them off as paid and see where
-the money goes. It unlocks with a four-digit PIN; the data file is AES-256 encrypted with a key derived from
+recurring payments (amount, day of the month, recipient, category, optionally the last month they run) and
+see where the money goes. It unlocks with a four-digit PIN; the data file is AES-256 encrypted with a key derived from
 the PIN, wrapped in Windows DPAPI, and never leaves your machine. It is a PowerShell script with a WPF
 window: download [Mesec.zip](https://github.com/JohnyLeeJohnes/mesec/releases/latest/download/Mesec.zip),
 unblock and extract it, and run `install.cmd` to get a shortcut. Nothing to compile or install. The interface

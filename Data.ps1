@@ -100,13 +100,13 @@ function Open-Mesec([string]$path, [string]$pin) {
 
 # ---- Rozpočet ----
 # items: @{ id; name; amount; day; to; cat; from; until }. Měsíce jsou texty 'yyyy-MM', takže jdou porovnávat.
-# Položka platí od měsíce from do until včetně; prázdné until = každý měsíc dál, until = from je jednorázová.
-# Změna opakované platby založí od daného měsíce novou verzi se stejným id, takže starší měsíce zůstanou.
-# paid: 'yyyy-MM|id' za každou zaplacenou platbu.
+# Položka je pravidelná platba: platí každý měsíc od from do until včetně, prázdné until = bez omezení.
+# Změna založí od daného měsíce novou verzi se stejným id, takže starší měsíce zůstanou.
+# skipped: 'yyyy-MM|id' za každý měsíc, ve kterém je platba smazaná jen pro ten měsíc.
 
-function New-Mesec { @{ items = @(); paid = @() } }
+function New-Mesec { @{ items = @(); skipped = @() } }
 
-# Co přijde ze souboru, srovná do známých typů; cokoli navíc zahodí.
+# Co přijde ze souboru, srovná do známých typů; cokoli navíc zahodí (třeba zaškrtnutí "zaplaceno" ze starších verzí).
 function ConvertFrom-MesecJson([string]$json) {
     $raw = ConvertFrom-Json $json
     @{
@@ -117,7 +117,7 @@ function ConvertFrom-MesecJson([string]$json) {
                 from = "$($item.from)"; until = "$($item.until)"
             }
         })
-        paid = @(foreach ($mark in $raw.paid) { "$mark" })
+        skipped = @(foreach ($mark in $raw.skipped) { "$mark" })
     }
 }
 
@@ -129,6 +129,12 @@ function Add-Month([string]$month, [int]$count) { Get-MonthKey (Get-MonthStart $
 function Format-Month([string]$month) {
     $text = (Get-MonthStart $month).ToString('MMMM yyyy', $cs)
     $text.Substring(0, 1).ToUpper($cs) + $text.Substring(1)
+}
+
+# "do října 2026"
+function Format-Until([string]$month) {
+    $start = Get-MonthStart $month
+    "do $($cs.DateTimeFormat.MonthGenitiveNames[$start.Month - 1]) $($start.Year)"
 }
 
 # "15 000 Kč", haléře jen když nějaké jsou
@@ -144,15 +150,16 @@ function ConvertTo-Amount([string]$text) {
     if ($amount -gt 0) { $amount }
 }
 
-# Den splatnosti v kratším měsíci končí posledním dnem (31. → 28. února).
-function Get-DueDate([string]$month, [int]$day) {
-    $start = Get-MonthStart $month
-    $start.AddDays([Math]::Min($day, [DateTime]::DaysInMonth($start.Year, $start.Month)) - 1)
+# ponytail: vynechané měsíce se hledají v prostém seznamu. Po letech používání z něj udělej HashSet.
+function Get-MonthItems($data, [string]$month) {
+    @($data.items | Where-Object {
+            $_.from -le $month -and (-not $_.until -or $_.until -ge $month) -and $data.skipped -notcontains "$month|$($_.id)"
+        } | Sort-Object { $_.day }, { $_.name })
 }
 
-function Get-MonthItems($data, [string]$month) {
-    @($data.items | Where-Object { $_.from -le $month -and (-not $_.until -or $_.until -ge $month) } |
-        Sort-Object { $_.day }, { $_.name })
+# Poslední měsíc platby přes všechny její verze; '' = bez omezení.
+function Get-EntryEnd($data, [string]$id) {
+    @($data.items | Where-Object { $_.id -eq $id } | Sort-Object { $_.from })[-1].until
 }
 
 function Get-Total($items) {
@@ -161,24 +168,11 @@ function Get-Total($items) {
     $total
 }
 
-# ponytail: zaplacené platby se hledají v prostém seznamu. Po letech používání z něj udělej HashSet.
-function Test-Paid($data, [string]$month, [string]$id) { $data.paid -contains "$month|$id" }
-
-function Set-Paid($data, [string]$month, [string]$id, [bool]$paid) {
-    $data.paid = @($data.paid | Where-Object { $_ -ne "$month|$id" })
-    if ($paid) { $data.paid += "$month|$id" }
-}
-
 function Get-Summary($data, [string]$month) {
     $items = Get-MonthItems $data $month
-    $expenses = @($items | Where-Object { $_.cat -ne $incomeCategory })
-    $unpaid = @($expenses | Where-Object { -not (Test-Paid $data $month $_.id) })
     @{
         Income = Get-Total @($items | Where-Object { $_.cat -eq $incomeCategory })
-        Expenses = Get-Total $expenses
-        Unpaid = Get-Total $unpaid
-        Count = $expenses.Count
-        PaidCount = $expenses.Count - $unpaid.Count
+        Expenses = Get-Total @($items | Where-Object { $_.cat -ne $incomeCategory })
     }
 }
 
@@ -188,35 +182,28 @@ function Get-Breakdown($data, [string]$month) {
         ForEach-Object { @{ Name = $_.Name; Amount = Get-Total $_.Group } } | Sort-Object { $_.Amount } -Descending
 }
 
-# Dvanáct měsíců roku; budoucí měsíce počítají s tím, co se opakuje.
+# Dvanáct měsíců roku; budoucí měsíce počítají s platbami, které do nich dosáhnou.
 function Get-Year($data, [int]$year) {
     foreach ($number in 1..12) {
         $month = '{0}-{1:00}' -f $year, $number
-        $items = Get-MonthItems $data $month
-        @{
-            Month = $month
-            Income = Get-Total @($items | Where-Object { $_.cat -eq $incomeCategory })
-            Expenses = Get-Total @($items | Where-Object { $_.cat -ne $incomeCategory })
-        }
+        $summary = Get-Summary $data $month
+        $summary.Month = $month
+        $summary
     }
 }
 
-# Uloží položku z formuláře: $entry = @{ id (prázdné = nová); name; amount; day; to; cat; monthly }.
+# Uloží platbu z formuláře: $entry = @{ id (prázdné = nová); name; amount; day; to; cat; until ('' = bez omezení) }.
+# Od měsíce $month dál platí to, co je ve formuláři; starší měsíce zůstanou, jak byly.
 function Set-Entry($data, [string]$month, $entry) {
-    $old = Get-MonthItems $data $month | Where-Object { $_.id -eq $entry.id }
-    $new = @{
-        id = if ($old) { $old.id } else { [guid]::NewGuid().ToString('N').Substring(0, 8) }
-        name = $entry.name; amount = [decimal]$entry.amount; day = [int]$entry.day; to = "$($entry.to)"; cat = $entry.cat
-        from = $month
-        # Platba, která už má naplánovaný konec, si ho nechá.
-        until = if (-not $entry.monthly) { $month } elseif ($old -and $old.until -gt $month) { $old.until } else { '' }
+    $id = if ($entry.id) { $entry.id } else { [guid]::NewGuid().ToString('N').Substring(0, 8) }
+    Remove-Entry $data $month $id
+    $data.items += @{
+        id = $id; name = $entry.name; amount = [decimal]$entry.amount; day = [int]$entry.day
+        to = "$($entry.to)"; cat = $entry.cat; from = $month; until = "$($entry.until)"
     }
-    if ($old -and $old.from -lt $month) { $old.until = Add-Month $month -1 }
-    elseif ($old) { $data.items = @($data.items | Where-Object { $_.id -ne $old.id -or $_.from -ne $old.from }) }
-    $data.items += $new
 }
 
-# Smaže položku od měsíce $month dál; starší měsíce zůstanou, jak byly.
+# Smaže platbu od měsíce $month dál; starší měsíce zůstanou, jak byly.
 function Remove-Entry($data, [string]$month, [string]$id) {
     $data.items = @($data.items | Where-Object { $_.id -ne $id -or $_.from -lt $month })
     foreach ($item in $data.items) {
@@ -224,12 +211,15 @@ function Remove-Entry($data, [string]$month, [string]$id) {
     }
 }
 
+# Smaže platbu jen pro měsíc $month; před ním i po něm běží dál.
+function Skip-Entry($data, [string]$month, [string]$id) { $data.skipped += "$month|$id" }
+
 # ---- Ukázka ----
 # Vymyšlený rozpočet živnostníka za poslední rok, počítaný od dneška, aby nezestárl.
 function New-DemoMesec {
     $now = Get-MonthKey ([DateTime]::Today)
     $data = New-Mesec
-    # název, částka, den, kam, typ, začátek (před kolika měsíci), konec ('' = běží dál)
+    # název, částka, den, příjemce, typ, začátek a konec (před kolika měsíci; záporné = v budoucnu, '' = bez omezení)
     $rows = @(
         @('Faktury', 74000, 10, 'Klienti', $incomeCategory, 14, 6),
         @('Faktury', 81000, 10, 'Klienti', $incomeCategory, 5, ''),
@@ -245,13 +235,12 @@ function New-DemoMesec {
         @('Akciové fondy', 6000, 12, 'Broker', 'Investice', 9, ''),
         @('Rezerva', 4000, 11, 'Spořicí účet', 'Spoření', 14, ''),
         @('Životní pojištění', 950, 25, 'Pojišťovna', 'Pojištění', 14, ''),
-        @('Splátka auta', 5400, 18, 'Leasingová společnost', 'Splátky', 14, ''),
+        @('Splátka auta', 5400, 18, 'Leasingová společnost', 'Splátky', 14, -9),
         @('Internet a mobil', 899, 20, 'Operátor', 'Předplatné', 14, ''),
         @('Filmy a hudba', 429, 3, '', 'Předplatné', 14, ''),
-        @('Nová pračka', 11990, 14, 'Elektro', 'Bydlení', 7, 7),
-        @('Dovolená', 24000, 9, 'Cestovní kancelář', 'Zábava', 3, 3),
-        @('Servis auta', 7800, 21, 'Autoservis', 'Doprava', 1, 1),
-        @('Dárek k narozeninám', 1500, 22, '', 'Ostatní', 0, 0)
+        @('Splátka pračky', 1990, 14, 'Elektro', 'Splátky', 7, 2),
+        @('Jazykový kurz', 2400, 9, 'Jazyková škola', 'Zábava', 4, 0),
+        @('Posilovna', 990, 22, 'Fitness centrum', 'Zábava', 10, '')
     )
     $number = 0
     $data.items = @(foreach ($row in $rows) {
@@ -260,8 +249,8 @@ function New-DemoMesec {
             from = Add-Month $now (-$row[5]); until = if ($row[6] -is [string]) { '' } else { Add-Month $now (-$row[6]) }
         }
     })
-    # Tenhle měsíc je zaplacené všechno, co už mělo splatnost, až na jednu platbu po splatnosti.
-    $data.paid = @(Get-MonthItems $data $now | Where-Object { $_.day -le [DateTime]::Today.Day -and $_.name -ne 'Filmy a hudba' } |
-        ForEach-Object { "$now|$($_.id)" })
+    # Dva měsíce se kupón na MHD nekupoval.
+    $transit = ($data.items | Where-Object { $_.name -eq 'Kupón na MHD' }).id
+    $data.skipped = @("$(Add-Month $now -3)|$transit", "$(Add-Month $now -2)|$transit")
     $data
 }

@@ -198,8 +198,8 @@
             </Setter>
         </Style>
 
-        <!-- Vedlejší akce -->
-        <Style x:Key="QuietButton" TargetType="Button">
+        <!-- Vedlejší akce. ButtonBase, aby styl sedl i na RepeatButton ve vybírátku měsíce. -->
+        <Style x:Key="QuietButton" TargetType="ButtonBase">
             <Setter Property="Height" Value="36"/>
             <Setter Property="Padding" Value="16,0"/>
             <Setter Property="Foreground" Value="{StaticResource Muted}"/>
@@ -207,7 +207,7 @@
             <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
             <Setter Property="Template">
                 <Setter.Value>
-                    <ControlTemplate TargetType="Button">
+                    <ControlTemplate TargetType="ButtonBase">
                         <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Stroke}"
                                 BorderThickness="1" CornerRadius="10" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -218,14 +218,17 @@
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource StrokeHover}"/>
                                 <Setter Property="Foreground" Value="{StaticResource Text}"/>
                             </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
+                            </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
         </Style>
 
-        <!-- Šipky mezi měsíci: znak ze Segoe MDL2 Assets -->
-        <Style x:Key="NavButton" TargetType="Button" BasedOn="{StaticResource QuietButton}">
+        <!-- Šipky mezi měsíci a roky: znak ze Segoe MDL2 Assets -->
+        <Style x:Key="NavButton" TargetType="ButtonBase" BasedOn="{StaticResource QuietButton}">
             <Setter Property="Width" Value="36"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="FontFamily" Value="Segoe MDL2 Assets"/>
@@ -254,8 +257,47 @@
             </Setter>
         </Style>
 
-        <!-- Sloupec grafu: kliknutím se přejde na ten měsíc -->
-        <Style x:Key="BarButton" TargetType="Button">
+        <!-- Pole, které se nevyplňuje psaním: kliknutím otevře vybírátko -->
+        <Style x:Key="FieldButton" TargetType="Button">
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="{StaticResource Text}"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{StaticResource Well}" BorderBrush="{StaticResource Stroke}"
+                                BorderThickness="1" CornerRadius="9" Padding="12,0">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                           Foreground="{StaticResource Muted}" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                <ContentPresenter VerticalAlignment="Center"/>
+                            </DockPanel>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource StrokeHover}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Stín pod vybírátkem. Je na vlastním rámečku pod kartou, aby efekt nerozmazal text v ní. -->
+        <Style x:Key="PopupShadow" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource Surface}"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="4" Direction="270" Opacity="0.55"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Tlačítko, které se ozve až pod myší: sloupec grafu a název měsíce v záhlaví -->
+        <Style x:Key="GhostButton" TargetType="Button">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ToolTipService.InitialShowDelay" Value="150"/>
             <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
@@ -275,42 +317,12 @@
             </Setter>
         </Style>
 
-        <!-- Kolečko "zaplaceno" -->
-        <Style x:Key="PaidCheck" TargetType="CheckBox">
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Width="34" Height="34" Background="Transparent">
-                            <Border x:Name="Ring" Width="20" Height="20" CornerRadius="10" BorderThickness="1.5"
-                                    BorderBrush="{StaticResource Muted}" Background="Transparent">
-                                <TextBlock x:Name="Tick" Text="&#xE73E;" FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                           FontWeight="Bold" Foreground="{StaticResource OnAccent}" Visibility="Hidden"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Ring" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Ring" Property="Background" Value="{StaticResource Accent}"/>
-                                <Setter TargetName="Ring" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                                <Setter TargetName="Tick" Property="Visibility" Value="Visible"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Štítek typu ve formuláři -->
+        <!-- Štítek: typ ve formuláři, měsíc a den ve vybírátku -->
         <Style x:Key="Chip" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource Muted}"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="Height" Value="28"/>
+            <Setter Property="Padding" Value="12,0"/>
             <Setter Property="Margin" Value="0,0,6,6"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
@@ -318,7 +330,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="Bd" Background="Transparent" BorderBrush="{StaticResource Stroke}"
-                                BorderThickness="1" CornerRadius="14" Padding="12,0">
+                                BorderThickness="1" CornerRadius="14" Padding="{TemplateBinding Padding}">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
                         <ControlTemplate.Triggers>
@@ -332,40 +344,8 @@
                                 <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource Accent}"/>
                                 <Setter Property="Foreground" Value="{StaticResource Accent}"/>
                             </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Řádek s přepínačem: text vlevo, posuvník vpravo, kliknout jde kamkoli do řádku -->
-        <Style x:Key="Switch" TargetType="CheckBox">
-            <Setter Property="Foreground" Value="{StaticResource Text}"/>
-            <Setter Property="Height" Value="34"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FocusVisualStyle" Value="{StaticResource FocusRing}"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="CheckBox">
-                        <Grid Background="Transparent">
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <ContentPresenter VerticalAlignment="Center"/>
-                            <Border x:Name="Track" Grid.Column="1" Width="38" Height="22" CornerRadius="11"
-                                    Margin="12,0,0,0" VerticalAlignment="Center" BorderThickness="1"
-                                    Background="{StaticResource Well}" BorderBrush="{StaticResource StrokeHover}">
-                                <Ellipse x:Name="Thumb" Width="14" Height="14" Margin="3,0"
-                                         HorizontalAlignment="Left" Fill="{StaticResource Muted}"/>
-                            </Border>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="{StaticResource Accent}"/>
-                                <Setter TargetName="Track" Property="BorderBrush" Value="{StaticResource Accent}"/>
-                                <Setter TargetName="Thumb" Property="Fill" Value="{StaticResource OnAccent}"/>
-                                <Setter TargetName="Thumb" Property="HorizontalAlignment" Value="Right"/>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.35"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -390,9 +370,16 @@
                 <StackPanel Orientation="Horizontal">
                     <Button x:Name="PrevButton" Style="{StaticResource NavButton}" Content="&#xE76B;"
                             ToolTip="Předchozí měsíc" AutomationProperties.Name="Předchozí měsíc"/>
-                    <TextBlock x:Name="MonthText" Width="196" FontSize="22" FontWeight="SemiBold"
-                               TextAlignment="Center" VerticalAlignment="Center"
-                               TextOptions.TextFormattingMode="Ideal"/>
+                    <!-- Název měsíce otevírá vybírátko měsíce a roku. -->
+                    <Button x:Name="MonthButton" Style="{StaticResource GhostButton}" Width="188" Height="36" Margin="4,0"
+                            ToolTip="Vybrat měsíc a rok" AutomationProperties.Name="Vybrat měsíc a rok">
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock x:Name="MonthText" FontSize="22" FontWeight="SemiBold" Foreground="{StaticResource Text}"
+                                       TextOptions.TextFormattingMode="Ideal"/>
+                            <TextBlock Text="&#xE70D;" FontFamily="Segoe MDL2 Assets" FontSize="10" Margin="9,4,0,0"
+                                       Foreground="{StaticResource Muted}" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
                     <Button x:Name="NextButton" Style="{StaticResource NavButton}" Content="&#xE76C;"
                             ToolTip="Další měsíc" AutomationProperties.Name="Další měsíc"/>
                     <Button x:Name="TodayButton" Style="{StaticResource QuietButton}" Content="Tento měsíc" Margin="12,0,0,0"/>
@@ -434,12 +421,6 @@
                         <TextBlock x:Name="LeftText" Style="{StaticResource Figure}"/>
                     </StackPanel>
                 </Border>
-                <Border Style="{StaticResource Card}" Margin="6,0">
-                    <StackPanel>
-                        <TextBlock Style="{StaticResource SectionLabel}" Text="Ještě zaplatit"/>
-                        <TextBlock x:Name="UnpaidText" Style="{StaticResource Figure}"/>
-                    </StackPanel>
-                </Border>
             </UniformGrid>
 
             <Grid Grid.Row="2" Margin="0,12,0,0">
@@ -449,24 +430,12 @@
                     <ColumnDefinition Width="380"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Rozpis plateb -->
+                <!-- Rozpis pravidelných plateb -->
                 <Border Style="{StaticResource Card}" Padding="12,14,6,8">
                     <DockPanel>
                         <DockPanel DockPanel.Dock="Top" Margin="6,0,12,10">
                             <Button x:Name="AddButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="+  Přidat"/>
-                            <!-- Kolik plateb měsíce je už zaplacených -->
-                            <StackPanel DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,16,0" Width="120">
-                                <TextBlock x:Name="PaidText" Style="{StaticResource Small}" TextAlignment="Right"/>
-                                <Grid Height="4" Margin="0,5,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition x:Name="PaidDone" Width="0*"/>
-                                        <ColumnDefinition x:Name="PaidRest" Width="1*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <Border Grid.ColumnSpan="2" Background="{StaticResource Well}" CornerRadius="2"/>
-                                    <Border Background="{StaticResource Accent}" CornerRadius="2"/>
-                                </Grid>
-                            </StackPanel>
-                            <TextBlock Style="{StaticResource CardTitle}" Text="Rozpis plateb"/>
+                            <TextBlock Style="{StaticResource CardTitle}" Text="Pravidelné platby"/>
                         </DockPanel>
                         <Grid>
                             <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
@@ -474,42 +443,32 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
                                             <Button Style="{StaticResource RowButton}" AutomationProperties.Name="{Binding Name}">
-                                                <Grid>
+                                                <!-- MinHeight: řádek bez poznámky pod názvem je stejně vysoký jako s ní. -->
+                                                <Grid MinHeight="34">
                                                     <Grid.ColumnDefinitions>
-                                                        <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="40"/>
                                                         <ColumnDefinition/>
                                                         <ColumnDefinition Width="Auto"/>
                                                         <ColumnDefinition Width="118"/>
                                                     </Grid.ColumnDefinitions>
-                                                    <CheckBox Style="{StaticResource PaidCheck}" IsChecked="{Binding Paid, Mode=OneWay}"
-                                                              ToolTip="{Binding PaidTip}" AutomationProperties.Name="{Binding PaidTip}"/>
-                                                    <TextBlock x:Name="Day" Grid.Column="1" Text="{Binding Day}" Foreground="{StaticResource Muted}"
+                                                    <TextBlock Text="{Binding Day}" Foreground="{StaticResource Muted}"
                                                                FontSize="14" VerticalAlignment="Center" Margin="4,0,0,0"/>
-                                                    <StackPanel x:Name="Texts" Grid.Column="2" VerticalAlignment="Center">
+                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding Name}" FontSize="14" TextTrimming="CharacterEllipsis"/>
                                                         <TextBlock x:Name="Note" Text="{Binding Note}" Style="{StaticResource Small}"/>
                                                     </StackPanel>
-                                                    <Border Grid.Column="3" Height="22" CornerRadius="11" Padding="9,0" Margin="10,0"
+                                                    <Border Grid.Column="2" Height="22" CornerRadius="11" Padding="9,0" Margin="10,0"
                                                             VerticalAlignment="Center" BorderThickness="1" BorderBrush="{StaticResource Stroke}">
                                                         <TextBlock Text="{Binding Category}" FontSize="11.5" Foreground="{StaticResource Muted}"
                                                                    VerticalAlignment="Center"/>
                                                     </Border>
-                                                    <TextBlock x:Name="Amount" Grid.Column="4" Text="{Binding Amount}" FontSize="14" FontWeight="SemiBold"
+                                                    <TextBlock Grid.Column="3" Text="{Binding Amount}" FontSize="14" FontWeight="SemiBold"
                                                                TextAlignment="Right" VerticalAlignment="Center"/>
                                                 </Grid>
                                             </Button>
                                             <DataTemplate.Triggers>
                                                 <DataTrigger Binding="{Binding Note}" Value="">
                                                     <Setter TargetName="Note" Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Paid}" Value="True">
-                                                    <Setter TargetName="Texts" Property="Opacity" Value="0.55"/>
-                                                    <Setter TargetName="Amount" Property="Opacity" Value="0.55"/>
-                                                </DataTrigger>
-                                                <DataTrigger Binding="{Binding Late}" Value="True">
-                                                    <Setter TargetName="Day" Property="Foreground" Value="{StaticResource Danger}"/>
-                                                    <Setter TargetName="Note" Property="Foreground" Value="{StaticResource Danger}"/>
                                                 </DataTrigger>
                                             </DataTemplate.Triggers>
                                         </DataTemplate>
@@ -518,7 +477,7 @@
                             </ScrollViewer>
                             <TextBlock x:Name="EmptyText" Style="{StaticResource Small}" FontSize="13" TextWrapping="Wrap"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center"
-                                       Text="Tenhle měsíc je prázdný.&#10;Přidej první platbu nebo příjem tlačítkem nahoře."/>
+                                       Text="Tenhle měsíc je prázdný.&#10;Přidej první pravidelnou platbu nebo příjem tlačítkem nahoře."/>
                         </Grid>
                     </DockPanel>
                 </Border>
@@ -582,7 +541,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Style="{StaticResource BarButton}" ToolTip="{Binding Tip}" AutomationProperties.Name="{Binding Tip}">
+                                            <Button Style="{StaticResource GhostButton}" ToolTip="{Binding Tip}" AutomationProperties.Name="{Binding Tip}">
                                                 <Grid>
                                                     <Grid.RowDefinitions>
                                                         <RowDefinition Height="{Binding Rest}"/>
@@ -634,7 +593,7 @@
             </Grid>
         </Grid>
 
-        <!-- Formulář položky -->
+        <!-- Formulář platby -->
         <Grid x:Name="EditorView" Background="{StaticResource Scrim}" Visibility="Collapsed">
             <Border Style="{StaticResource Card}" Width="540" Padding="24,20,24,22" VerticalAlignment="Center"
                     BorderBrush="{StaticResource StrokeHover}">
@@ -657,36 +616,88 @@
                             <TextBox x:Name="AmountBox" MaxLength="14" AutomationProperties.Name="Částka v Kč"/>
                         </StackPanel>
                         <StackPanel Grid.Column="2">
-                            <TextBlock Style="{StaticResource SectionLabel}" Text="Den splatnosti" Margin="0,0,0,6"/>
-                            <TextBox x:Name="DayBox" MaxLength="2" AutomationProperties.Name="Den splatnosti"/>
+                            <TextBlock Style="{StaticResource SectionLabel}" Text="Den v měsíci" Margin="0,0,0,6"/>
+                            <Button x:Name="DayButton" Style="{StaticResource FieldButton}" AutomationProperties.Name="Den v měsíci"
+                                    ToolTip="Kolikátého se platba každý měsíc dělá."/>
                         </StackPanel>
                         <StackPanel Grid.Column="4">
-                            <TextBlock Style="{StaticResource SectionLabel}" Text="Kam to jde" Margin="0,0,0,6"/>
-                            <TextBox x:Name="ToBox" MaxLength="60" AutomationProperties.Name="Kam to jde"
-                                     ToolTip="Příjemce, účet nebo cokoli, podle čeho platbu poznáš."/>
+                            <TextBlock Style="{StaticResource SectionLabel}" Text="Příjemce" Margin="0,0,0,6"/>
+                            <TextBox x:Name="ToBox" MaxLength="60" AutomationProperties.Name="Příjemce"
+                                     ToolTip="Komu nebo na jaký účet platba jde. U příjmu od koho přichází."/>
                         </StackPanel>
                     </Grid>
 
                     <TextBlock Style="{StaticResource SectionLabel}" Text="Typ" Margin="0,14,0,8"/>
                     <WrapPanel x:Name="Categories"/>
 
-                    <CheckBox x:Name="MonthlyToggle" Style="{StaticResource Switch}" Margin="0,8,0,0">
-                        <TextBlock>
-                            <Run Text="Každý měsíc"/>
-                            <Run Text="  vypnuté = jen tenhle měsíc" Foreground="{StaticResource Muted}" FontSize="12"/>
-                        </TextBlock>
-                    </CheckBox>
+                    <!-- Poslední měsíc, kdy se ještě platí, nebo bez omezení. Volí se ve vybírátku. -->
+                    <TextBlock Style="{StaticResource SectionLabel}" Text="Platí do" Margin="0,8,0,6"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button x:Name="UntilButton" Style="{StaticResource FieldButton}" Width="190" AutomationProperties.Name="Platí do"/>
+                        <TextBlock Style="{StaticResource Small}" Text="poslední měsíc, kdy se ještě platí"
+                                   VerticalAlignment="Center" Margin="12,0,0,0"/>
+                    </StackPanel>
 
-                    <TextBlock x:Name="EditorStatus" Style="{StaticResource Small}" TextWrapping="Wrap" MinHeight="32" Margin="0,8,0,0"/>
+                    <TextBlock x:Name="EditorStatus" Style="{StaticResource Small}" TextWrapping="Wrap" MinHeight="32" Margin="0,12,0,0"/>
 
                     <DockPanel Margin="0,8,0,0">
                         <Button x:Name="SaveButton" DockPanel.Dock="Right" Style="{StaticResource PrimaryButton}" Content="Uložit" MinWidth="110"/>
                         <Button x:Name="CancelButton" DockPanel.Dock="Right" Style="{StaticResource QuietButton}" Content="Zrušit" Margin="0,0,8,0"/>
-                        <Button x:Name="DeleteButton" Style="{StaticResource QuietButton}" HorizontalAlignment="Left"/>
+                        <!-- Smazat se zeptá, jestli jen zobrazený měsíc, nebo i další. Tlačítka střídá Mesec.ps1. -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left">
+                            <Button x:Name="DeleteButton" Style="{StaticResource QuietButton}" Content="Smazat"
+                                    Foreground="{StaticResource Danger}"/>
+                            <StackPanel x:Name="DeleteChoices" Orientation="Horizontal">
+                                <Button x:Name="DeleteMonthButton" Style="{StaticResource QuietButton}" Content="Jen tenhle měsíc"
+                                        Foreground="{StaticResource Danger}" Margin="0,0,8,0"/>
+                                <Button x:Name="DeleteOnwardButton" Style="{StaticResource QuietButton}" Content="I všechny další"
+                                        Foreground="{StaticResource Danger}"/>
+                            </StackPanel>
+                        </StackPanel>
                     </DockPanel>
                 </StackPanel>
             </Border>
         </Grid>
+
+        <!-- Vybírátka: den, měsíc ani rok se nikde nepíšou. Štítky do nich doplní Mesec.ps1.
+             Okraj mřížky je místo pro stín; HorizontalOffset ho vrací zpátky pod levý okraj tlačítka. -->
+
+        <!-- Den v měsíci -->
+        <Popup x:Name="DayPicker" StaysOpen="False" AllowsTransparency="True" Placement="Bottom"
+               PlacementTarget="{Binding ElementName=DayButton}" HorizontalOffset="-14" VerticalOffset="4">
+            <Grid Margin="14,0,14,18">
+                <Border Style="{StaticResource PopupShadow}"/>
+                <Border Style="{StaticResource Card}" Width="300" Padding="12,12,12,6" BorderBrush="{StaticResource StrokeHover}">
+                    <!-- Záporný okraj vyrovnává mezeru, kterou má každý štítek vpravo. -->
+                    <UniformGrid x:Name="PickerDays" Columns="7" Margin="0,0,-6,0"/>
+                </Border>
+            </Grid>
+        </Popup>
+
+        <!-- Měsíc a rok. Mesec.ps1 ho otevírá pod tlačítkem, ke kterému zrovna patří. -->
+        <Popup x:Name="MonthPicker" StaysOpen="False" AllowsTransparency="True" Placement="Bottom"
+               HorizontalOffset="-14" VerticalOffset="4">
+            <Grid Margin="14,0,14,18">
+                <Border Style="{StaticResource PopupShadow}"/>
+                <Border Style="{StaticResource Card}" Width="300" Padding="12" BorderBrush="{StaticResource StrokeHover}">
+                    <StackPanel>
+                        <DockPanel>
+                            <!-- Podržením tlačítka roky běží samy. -->
+                            <RepeatButton x:Name="PickerPrevYear" DockPanel.Dock="Left" Style="{StaticResource NavButton}"
+                                          Content="&#xE76B;" Delay="400" Interval="110"
+                                          ToolTip="Předchozí rok" AutomationProperties.Name="Předchozí rok"/>
+                            <RepeatButton x:Name="PickerNextYear" DockPanel.Dock="Right" Style="{StaticResource NavButton}"
+                                          Content="&#xE76C;" Delay="400" Interval="110"
+                                          ToolTip="Další rok" AutomationProperties.Name="Další rok"/>
+                            <TextBlock x:Name="PickerYear" FontSize="16" FontWeight="SemiBold" TextAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </DockPanel>
+                        <UniformGrid x:Name="PickerMonths" Columns="3" Margin="0,12,-6,0"/>
+                        <Button x:Name="PickerClearButton" Style="{StaticResource QuietButton}" Content="Bez omezení" Margin="0,6,0,0"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Popup>
 
         <!-- Zámek: zadání nebo volba PINu. Číslice chytá okno, žádné pole tu není. -->
         <Grid x:Name="LockView" Background="{StaticResource Bg}" Focusable="True" FocusVisualStyle="{x:Null}">

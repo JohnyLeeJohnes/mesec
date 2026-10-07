@@ -1,4 +1,4 @@
-﻿# Měšec: měsíční rozpočet pod PINem. Okno je popsané v Mesec.xaml, šifrování a počítání v Data.ps1.
+﻿# Měšec: pravidelné měsíční platby pod PINem. Okno je popsané v Mesec.xaml, šifrování a počítání v Data.ps1.
 #   Mesec.ps1                       spustí aplikaci
 #   Mesec.ps1 -Install              vytvoří zástupce s ikonou v nabídce Start, na ploše a ve složce s Měšcem
 #   Mesec.ps1 -Demo                 ukázková data bez PINu; na disk se nic neukládá
@@ -72,6 +72,9 @@ $state = @{
     Key = $null; Data = $null
     Mode = 'Unlock'; Pin = ''; FirstPin = $null; LockError = $null
     EditId = $null; EditHint = $null; EditError = $null; Deleting = $false
+    EditDay = 1      # den v měsíci ve formuláři
+    EditUntil = ''   # konec platby ve formuláři: 'yyyy-MM', '' = bez omezení
+    Pick = $null     # otevřené vybírátko měsíce, viz Open-Picker
 }
 
 # ---- Zámek ----
@@ -191,28 +194,17 @@ function Update-View {
     $ui.LeftLabel.Text = if ($left -lt 0) { 'Chybí' } else { 'Zbývá' }
     $ui.LeftText.Text = Format-Money ([Math]::Abs($left))
     $ui.LeftText.Foreground = $window.FindResource($(if ($left -lt 0) { 'Danger' } else { 'Text' }))
-    $ui.UnpaidText.Text = Format-Money $summary.Unpaid
-    $ui.PaidText.Text = "zaplaceno $($summary.PaidCount) z $($summary.Count)"
-    $stars = Get-Stars $summary.PaidCount $summary.Count
-    $ui.PaidDone.Width = $stars[0]
-    $ui.PaidRest.Width = $stars[1]
 
-    $today = [DateTime]::Today
     $rows = @(foreach ($item in Get-MonthItems $data $month) {
-        $income = $item.cat -eq $incomeCategory
-        $paid = Test-Paid $data $month $item.id
-        $late = -not $paid -and -not $income -and (Get-DueDate $month $item.day) -lt $today
-        $notes = $item.to, $(if ($item.until -eq $item.from) { 'jednorázově' }), $(if ($late) { 'po splatnosti' })
+        $end = Get-EntryEnd $data $item.id
+        $notes = $item.to, $(if ($end -eq $month) { 'naposledy' } elseif ($end) { Format-Until $end })
         [pscustomobject]@{
             Id = $item.id
             Day = "$($item.day)."
             Name = $item.name
             Note = ($notes | Where-Object { $_ }) -join ' · '
             Category = $item.cat
-            Amount = $(if ($income) { '+' }) + (Format-Money $item.amount)
-            Paid = $paid
-            PaidTip = if ($income) { 'Přišlo' } else { 'Zaplaceno' }
-            Late = $late
+            Amount = $(if ($item.cat -eq $incomeCategory) { '+' }) + (Format-Money $item.amount)
         }
     })
     $ui.Rows.ItemsSource = $rows
@@ -268,42 +260,83 @@ function Set-Month([string]$month) {
     Update-View
 }
 
-function Switch-Paid($row, [bool]$paid) {
-    Set-Paid $state.Data $state.Month $row.Id $paid
-    Save-State
-    Update-View
+# ---- Vybírátko měsíce ----
+
+# Měsíc a rok se nikde nepíšou, vždycky se volí tady. $for říká, co se vybírá: 'Month' = zobrazený měsíc
+# v záhlaví, 'Until' = konec platby ve formuláři. Ten nesmí být před zobrazeným měsícem a jde i zrušit.
+function Open-Picker([string]$for) {
+    $until = $for -eq 'Until'
+    $value = if ($until) { $state.EditUntil } else { $state.Month }
+    $state.Pick = @{
+        For = $for; Value = $value
+        Min = if ($until) { $state.Month } else { '' }
+        Year = [int]$(if ($value) { $value } else { $state.Month }).Substring(0, 4)
+    }
+    $ui.PickerClearButton.Visibility = if ($until) { 'Visible' } else { 'Collapsed' }
+    $ui.MonthPicker.PlacementTarget = if ($until) { $ui.UntilButton } else { $ui.MonthButton }
+    Update-Picker
+    $ui.MonthPicker.IsOpen = $true
 }
 
-# ---- Formulář položky ----
+function Update-Picker {
+    $pick = $state.Pick
+    $ui.PickerYear.Text = $pick.Year
+    # Měsíce jsou v datech 'yyyy-MM', takže rok má vždycky čtyři číslice.
+    $ui.PickerPrevYear.IsEnabled = $pick.Year -gt $(if ($pick.Min) { [int]$pick.Min.Substring(0, 4) } else { 1000 })
+    $ui.PickerNextYear.IsEnabled = $pick.Year -lt 9999
+    foreach ($chip in $ui.PickerMonths.Children) {
+        $month = Get-MonthKey ([DateTime]::new($pick.Year, $chip.Tag, 1))
+        $chip.IsChecked = $month -eq $pick.Value
+        $chip.IsEnabled = $month -ge $pick.Min
+    }
+}
+
+# $month = zvolený měsíc, '' = bez omezení
+function Close-Picker([string]$month) {
+    $ui.MonthPicker.IsOpen = $false
+    if ($state.Pick.For -eq 'Until') {
+        $state.EditUntil = $month
+        Update-Editor
+    }
+    else { Set-Month $month }
+}
+
+# ---- Formulář platby ----
+
+# "říjen 2026": zobrazený měsíc do věty
+function Format-Shown { (Format-Month $state.Month).ToLower($cs) }
 
 function Update-Editor {
-    $ui.DeleteButton.Content = if ($state.Deleting) { 'Opravdu smazat?' } else { 'Smazat' }
+    $ui.DayButton.Content = "$($state.EditDay)."
+    $ui.UntilButton.Content = if ($state.EditUntil) { Format-Month $state.EditUntil } else { 'Bez omezení' }
+    # Smazat se nejdřív zeptá, jestli jen zobrazený měsíc, nebo i všechny další.
+    $ui.DeleteButton.Visibility = if ($state.EditId -and -not $state.Deleting) { 'Visible' } else { 'Collapsed' }
+    $ui.DeleteChoices.Visibility = if ($state.Deleting) { 'Visible' } else { 'Collapsed' }
     $ui.EditorStatus.Foreground = $window.FindResource($(if ($state.EditError) { 'Danger' } else { 'Muted' }))
     $ui.EditorStatus.Text =
         if ($state.EditError) { $state.EditError }
+        elseif ($state.Deleting) { "Smazat jen v měsíci $(Format-Shown), nebo i ve všech dalších? Starší měsíce zůstanou, jak byly." }
         else { $state.EditHint }
 }
 
-# $row = řádek rozpisu, $null = nová položka
+# $row = řádek rozpisu, $null = nová platba
 function Open-Editor($row) {
     $item = if ($row) { Get-MonthItems $state.Data $state.Month | Where-Object { $_.id -eq $row.Id } }
     $state.EditId = if ($item) { $item.id } else { $null }
     $state.EditError = $null
     $state.Deleting = $false
     $state.EditHint =
-        if ($item -and $item.from -lt $state.Month) {
-            "Změna i smazání platí od měsíce $((Format-Month $state.Month).ToLower($cs)) dál. Starší měsíce zůstanou, jak byly."
-        }
+        if (-not $item) { "První platba bude v měsíci $(Format-Shown)." }
+        elseif ($item.from -lt $state.Month) { "Změna platí od měsíce $(Format-Shown) dál. Starší měsíce zůstanou, jak byly." }
 
-    $ui.EditorTitle.Text = if ($item) { 'Upravit položku' } else { 'Nová položka' }
+    $ui.EditorTitle.Text = if ($item) { 'Upravit platbu' } else { 'Nová pravidelná platba' }
     $ui.NameBox.Text = if ($item) { $item.name } else { '' }
     $ui.AmountBox.Text = if ($item) { $item.amount.ToString($(if ($item.amount % 1) { '0.00' } else { '0' }), $cs) } else { '' }
-    $ui.DayBox.Text = if ($item) { $item.day } else { [DateTime]::Today.Day }
+    $state.EditDay = if ($item) { $item.day } else { [DateTime]::Today.Day }
     $ui.ToBox.Text = if ($item) { $item.to } else { '' }
     $category = if ($item) { $item.cat } else { 'Ostatní' }
     foreach ($chip in $ui.Categories.Children) { $chip.IsChecked = $chip.Content -eq $category }
-    $ui.MonthlyToggle.IsChecked = -not $item -or $item.until -ne $item.from
-    $ui.DeleteButton.Visibility = if ($item) { 'Visible' } else { 'Collapsed' }
+    $state.EditUntil = if ($item) { "$(Get-EntryEnd $state.Data $item.id)" } else { '' }
     Update-Editor
 
     $ui.EditorView.Visibility = 'Visible'
@@ -316,18 +349,26 @@ function Close-Editor { $ui.EditorView.Visibility = 'Collapsed' }
 function Save-Editor {
     $name = $ui.NameBox.Text.Trim()
     $amount = ConvertTo-Amount $ui.AmountBox.Text
-    $day = 0
+    $state.Deleting = $false
     $state.EditError =
         if (-not $name) { 'Doplň název.' }
         elseif (-not $amount) { 'Částku napiš jako číslo větší než nula, třeba 1500 nebo 1499,90.' }
-        elseif (-not [int]::TryParse($ui.DayBox.Text.Trim(), [ref]$day) -or $day -lt 1 -or $day -gt 31) { 'Den splatnosti je číslo od 1 do 31.' }
     if ($state.EditError) { Update-Editor; return }
 
     Set-Entry $state.Data $state.Month @{
-        id = $state.EditId; name = $name; amount = $amount; day = $day; to = $ui.ToBox.Text.Trim()
+        id = $state.EditId; name = $name; amount = $amount; day = $state.EditDay; to = $ui.ToBox.Text.Trim()
         cat = ($ui.Categories.Children | Where-Object { $_.IsChecked }).Content
-        monthly = $ui.MonthlyToggle.IsChecked -eq $true
+        until = $state.EditUntil
     }
+    Save-State
+    Close-Editor
+    Update-View
+}
+
+# $onward = od zobrazeného měsíce dál, jinak jen zobrazený měsíc
+function Remove-Edited([bool]$onward) {
+    if ($onward) { Remove-Entry $state.Data $state.Month $state.EditId }
+    else { Skip-Entry $state.Data $state.Month $state.EditId }
     Save-State
     Close-Editor
     Update-View
@@ -356,13 +397,14 @@ try {
     if (Test-Path -LiteralPath $icon) { $window.Icon = [Windows.Media.Imaging.BitmapFrame]::Create([Uri]$icon) }
 
     $ui = @{}
-    'MainView', 'PrevButton', 'MonthText', 'NextButton', 'TodayButton', 'VaultButtons', 'BackupButton', 'PinButton',
-    'LockButton', 'IncomeText', 'ExpensesText', 'LeftLabel', 'LeftText', 'UnpaidText', 'AddButton', 'PaidText',
-    'PaidDone', 'PaidRest', 'Rows', 'EmptyText', 'Breakdown', 'BreakdownEmpty', 'AverageText', 'YearTitle', 'Bars',
-    'AverageMark', 'AverageRest', 'AverageFill', 'BarLabels', 'EditorView', 'EditorTitle', 'NameBox', 'AmountBox',
-    'DayBox', 'ToBox', 'Categories', 'MonthlyToggle', 'EditorStatus', 'SaveButton', 'CancelButton', 'DeleteButton',
-    'LockView', 'LockPrompt', 'Dots', 'LockStatus', 'RestoreButton', 'GatewayButton',
-    'LockGatewayButton' | ForEach-Object { $ui[$_] = $window.FindName($_) }
+    'MainView', 'PrevButton', 'MonthButton', 'MonthText', 'NextButton', 'TodayButton', 'VaultButtons', 'BackupButton',
+    'PinButton', 'LockButton', 'IncomeText', 'ExpensesText', 'LeftLabel', 'LeftText', 'AddButton', 'Rows', 'EmptyText',
+    'Breakdown', 'BreakdownEmpty', 'AverageText', 'YearTitle', 'Bars', 'AverageMark', 'AverageRest', 'AverageFill',
+    'BarLabels', 'EditorView', 'EditorTitle', 'NameBox', 'AmountBox', 'DayButton', 'ToBox', 'Categories', 'UntilButton',
+    'EditorStatus', 'SaveButton', 'CancelButton', 'DeleteButton', 'DeleteChoices', 'DeleteMonthButton',
+    'DeleteOnwardButton', 'DayPicker', 'PickerDays', 'MonthPicker', 'PickerPrevYear', 'PickerYear', 'PickerNextYear',
+    'PickerMonths', 'PickerClearButton', 'LockView', 'LockPrompt', 'Dots', 'LockStatus', 'RestoreButton',
+    'GatewayButton', 'LockGatewayButton' | ForEach-Object { $ui[$_] = $window.FindName($_) }
 
     # Když Měšec pustila Bránocesta, nechala v $env:BRANOCESTA cestu ke svému skriptu a v $env:BRANOCESTA_PID
     # číslo svého procesu. Tlačítko bránu vrátí a Měšec zavře. Při spuštění vlastním zástupcem proměnné nejsou
@@ -421,7 +463,24 @@ try {
         $chip.Content = $category
         $null = $ui.Categories.Children.Add($chip)
     }
-    $ui.DeleteButton.Foreground = $window.FindResource('Danger')
+    # Štítky vybírátek; Tag nese číslo měsíce nebo dne.
+    foreach ($number in 1..12) {
+        $chip = [Windows.Controls.RadioButton]::new()
+        $chip.Style = $window.FindResource('Chip')
+        $chip.GroupName = 'PickerMonth'
+        $chip.Content = $cs.DateTimeFormat.MonthNames[$number - 1]
+        $chip.Tag = $number
+        $null = $ui.PickerMonths.Children.Add($chip)
+    }
+    foreach ($number in 1..31) {
+        $chip = [Windows.Controls.RadioButton]::new()
+        $chip.Style = $window.FindResource('Chip')
+        $chip.GroupName = 'PickerDay'
+        $chip.Padding = [Windows.Thickness]::new(0)   # sedm štítků v řadě je úzkých, dvě číslice by okraj uřízl
+        $chip.Content = $number
+        $chip.Tag = $number
+        $null = $ui.PickerDays.Children.Add($chip)
+    }
 
     $window.Add_SourceInitialized({
         if (-not $native) { return }
@@ -438,7 +497,15 @@ try {
     # ve formuláři Enter a Esc.
     $window.Add_PreviewKeyDown({
         param($source, $e)
-        if ($ui.LockView.IsVisible) {
+        $picker = $ui.DayPicker, $ui.MonthPicker | Where-Object { $_.IsOpen }
+        if ($picker) {
+            # Esc zavře jen vybírátko; ostatní klávesy patří jeho tlačítkům, ne formuláři pod ním.
+            if ($e.Key -eq 'Escape') {
+                $picker.IsOpen = $false
+                $e.Handled = $true
+            }
+        }
+        elseif ($ui.LockView.IsVisible) {
             if ("$($e.Key)" -match '^(D|NumPad)(\d)$') { Add-Digit $Matches[2] }
             elseif ($e.Key -eq 'Back') {
                 if ($state.Pin) { $state.Pin = $state.Pin.Substring(0, $state.Pin.Length - 1) }
@@ -499,12 +566,10 @@ try {
     $ui.TodayButton.Add_Click({ Set-Month (Get-MonthKey ([DateTime]::Today)) })
     $ui.AddButton.Add_Click({ Open-Editor $null })
 
-    # Kliknutí v rozpisu: kolečko přepíná zaplaceno, zbytek řádku otevírá úpravu.
+    # Kliknutí na řádek rozpisu otevírá úpravu.
     $ui.Rows.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
         param($list, $e)
-        $clicked = $e.OriginalSource
-        if ($clicked -is [Windows.Controls.CheckBox]) { Switch-Paid $clicked.DataContext ($clicked.IsChecked -eq $true) }
-        else { Open-Editor $clicked.DataContext }
+        Open-Editor $e.OriginalSource.DataContext
     })
 
     $ui.Bars.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
@@ -512,22 +577,57 @@ try {
         Set-Month $e.OriginalSource.DataContext.Month
     })
 
-    # ---- Formulář položky ----
+    # ---- Formulář platby ----
 
     $ui.SaveButton.Add_Click({ Save-Editor })
     $ui.CancelButton.Add_Click({ Close-Editor })
     $ui.DeleteButton.Add_Click({
-        # První kliknutí se jen zeptá, druhé maže.
-        if (-not $state.Deleting) {
-            $state.Deleting = $true
-            Update-Editor
-            return
-        }
-        Remove-Entry $state.Data $state.Month $state.EditId
-        Save-State
-        Close-Editor
-        Update-View
+        $state.Deleting = $true
+        $state.EditError = $null
+        Update-Editor
     })
+    $ui.DeleteMonthButton.Add_Click({ Remove-Edited $false })
+    $ui.DeleteOnwardButton.Add_Click({ Remove-Edited $true })
+
+    # ---- Vybírátka ----
+
+    $ui.DayButton.Add_Click({
+        foreach ($chip in $ui.PickerDays.Children) { $chip.IsChecked = $chip.Tag -eq $state.EditDay }
+        $ui.DayPicker.IsOpen = $true
+    })
+    $ui.PickerDays.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
+        param($grid, $e)
+        $ui.DayPicker.IsOpen = $false
+        $state.EditDay = $e.OriginalSource.Tag
+        Update-Editor
+    })
+
+    $ui.MonthButton.Add_Click({ Open-Picker 'Month' })
+    $ui.UntilButton.Add_Click({ Open-Picker 'Until' })
+    $ui.PickerPrevYear.Add_Click({ $state.Pick.Year--; Update-Picker })
+    $ui.PickerNextYear.Add_Click({ $state.Pick.Year++; Update-Picker })
+    $ui.PickerClearButton.Add_Click({ Close-Picker '' })
+    $ui.PickerMonths.AddHandler([Windows.Controls.Primitives.ButtonBase]::ClickEvent, [Windows.RoutedEventHandler]{
+        param($grid, $e)
+        Close-Picker (Get-MonthKey ([DateTime]::new($state.Pick.Year, $e.OriginalSource.Tag, 1)))
+    })
+
+    # Klávesnice: po otevření má fokus vybraný (jinak první povolený) štítek, takže jdou šipky a mezerník.
+    # Po zavření se fokus vrací na tlačítko, pod kterým vybírátko bylo. Tag vybírátka = mřížka jeho štítků.
+    $ui.DayPicker.Tag = $ui.PickerDays
+    $ui.MonthPicker.Tag = $ui.PickerMonths
+    foreach ($picker in $ui.DayPicker, $ui.MonthPicker) {
+        $picker.Add_Opened({
+            param($popup)
+            $chips = @($popup.Tag.Children | Where-Object { $_.IsEnabled })
+            $chip = @($chips | Where-Object { $_.IsChecked }) + $chips | Select-Object -First 1
+            if ($chip) { $null = $chip.Focus() }
+        })
+        $picker.Add_Closed({
+            param($popup)
+            $null = $popup.PlacementTarget.Focus()
+        })
+    }
 
     if ($Demo) {
         $window.Title = 'Měšec (ukázka)'
