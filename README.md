@@ -41,7 +41,7 @@
 - **Ukázka bez PINu a bez ukládání:** `powershell -ExecutionPolicy Bypass -File Mesec.ps1 -Demo`
 - **S Bránocestou:** Měšec umí nainstalovat a spouštět i [Bránocesta](https://github.com/JohnyLeeJohnes/branocesta).
   Když ho pustíš z ní, má vpravo nahoře a na obrazovce s PINem tlačítko **Bránocesta**, které ho zavře
-  a bránu znovu otevře.
+  a bránu vrátí. S Bránocestou od verze 1.5.0 je zpátky hned, protože za Měšcem čeká schovaná.
 - **Nová verze:** stáhni ji stejně a rozbal přes tu starou. Data zůstanou, jsou uložená jinde.
 - **Přesunutí složky:** zástupce ukazuje tam, kde Měšec leží. Po přesunutí spusť `install.cmd` znovu.
 - **Odebrání:** smaž zástupce, složku s aplikací a data v `%APPDATA%\Mesec`.

@@ -3,6 +3,18 @@
 Všechny podstatné změny v projektu. Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 verze se řídí [sémantickým verzováním](https://semver.org/lang/cs/).
 
+## [1.2.0] - 2026-10-07
+
+### Přidáno
+
+- Vlastní ikona na hlavním panelu. Dosud tam Měšec měl ikonu PowerShellu, který jeho okno hostí.
+
+### Změněno
+
+- Tlačítko **Bránocesta** je zpátky v bráně hned. Bránocesta od verze 1.5.0 se za Měšcem nezavírá, jen se
+  schová; tlačítko ji zavolá a nic se nestartuje. Se starší bránou se chová jako dřív a otevře ji znovu.
+- Měšec startuje rychleji: kvůli tmavému titulku okna už nepouští kompilátor C#.
+
 ## [1.1.0] - 2026-10-06
 
 ### Přidáno
@@ -61,6 +73,7 @@ První vydání.
   Smart App Control.
 - Test `tests/test.ps1`, který zkouší šifrování, počítání po měsících a projde okno.
 
+[1.2.0]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.2.0
 [1.1.0]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.1.0
 [1.0.2]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.0.2
 [1.0.1]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.0.1
