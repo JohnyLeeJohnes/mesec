@@ -40,13 +40,24 @@ if ($Install) {
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, Microsoft.VisualBasic
 . (Join-Path $PSScriptRoot 'Data.ps1')
 
-# Když se Add-Type nepovede (třeba kvůli zásadám počítače), Měšec běží dál, jen má světlý titulek.
+# Dvě volání Windows API. Typ se skládá za běhu, ne přes Add-Type s kódem v C#: ten by kvůli nim pouštěl
+# kompilátor a start by se o znatelný kus protáhl. Když se to nepovede (třeba kvůli zásadám počítače), Měšec
+# běží dál, jen má světlý titulek a na hlavním panelu ikonu PowerShellu.
 $native = $null
 try {
-    $native = Add-Type -Namespace Mesec -Name Native -PassThru -MemberDefinition @'
-[DllImport("dwmapi.dll")]
-public static extern int DwmSetWindowAttribute(IntPtr hwnd, int attribute, ref int value, int size);
-'@
+    $assembly = [AppDomain]::CurrentDomain.DefineDynamicAssembly((New-Object Reflection.AssemblyName 'MesecNative'), 'Run')
+    $type = $assembly.DefineDynamicModule('MesecNative').DefineType('Mesec.Native', 'Public, Class')
+    # Knihovna, funkce, parametry; obě vracejí HRESULT.
+    $imports = @('dwmapi.dll', 'DwmSetWindowAttribute', @([IntPtr], [int], [int].MakeByRefType(), [int])),
+        @('shell32.dll', 'SetCurrentProcessExplicitAppUserModelID', @([string]))
+    foreach ($import in $imports) {
+        $method = $type.DefinePInvokeMethod($import[1], $import[0], 'Public, Static, PinvokeImpl', 'Standard', [int], [Type[]]$import[2], 'Winapi', 'Unicode')
+        $method.SetImplementationFlags('PreserveSig')
+    }
+    $native = $type.CreateType()
+    # Okno hostí powershell.exe, takže by ho Windows na hlavním panelu přiřadily k PowerShellu a ukázaly jeho
+    # ikonu. S vlastním označením je Měšec na panelu sám za sebe a s ikonou svého okna.
+    $null = $native::SetCurrentProcessExplicitAppUserModelID('JohnyLeeJohnes.Mesec')
 } catch { }
 
 function Resolve-Target([string]$path) { $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($path) }
@@ -353,25 +364,28 @@ try {
     'LockView', 'LockPrompt', 'Dots', 'LockStatus', 'RestoreButton', 'GatewayButton',
     'LockGatewayButton' | ForEach-Object { $ui[$_] = $window.FindName($_) }
 
-    # Když Měšec pustila Bránocesta, nechala v $env:BRANOCESTA cestu ke svému skriptu. Tlačítko ji otevře
-    # a Měšec zavře. Při spuštění vlastním zástupcem proměnná není a tlačítka zůstanou schovaná.
+    # Když Měšec pustila Bránocesta, nechala v $env:BRANOCESTA cestu ke svému skriptu a v $env:BRANOCESTA_PID
+    # číslo svého procesu. Tlačítko bránu vrátí a Měšec zavře. Při spuštění vlastním zástupcem proměnné nejsou
+    # a tlačítka zůstanou schovaná.
     $gateway = $env:BRANOCESTA
     if ($gateway -and (Split-Path $gateway -Leaf) -eq 'Branocesta.ps1' -and (Test-Path -LiteralPath $gateway)) {
         # Měšec se zavře, až když se okno brány ukáže, a pošle ho dopředu. Kdyby se zavřel hned, Windows by
-        # mezitím aktivovaly jiné okno a brána by se otevřela za ním. $handoff.Tag drží čas kliknutí.
+        # mezitím aktivovaly jiné okno a brána by se otevřela za ním.
+        # $handoff.Tag = @{ Since = čas kliknutí; Called = proces brány, která se nechala zavolat, jinak 0 }
         $handoff = [Windows.Threading.DispatcherTimer]::new()
-        $handoff.Interval = [TimeSpan]::FromMilliseconds(150)
+        $handoff.Interval = [TimeSpan]::FromMilliseconds(50)
         $handoff.Add_Tick({
             $shown = $null
             foreach ($process in [Diagnostics.Process]::GetProcessesByName('powershell')) {
                 try {
-                    if ($process.Id -ne $PID -and $process.StartTime -ge $handoff.Tag -and
-                        $process.MainWindowHandle -ne [IntPtr]::Zero) { $shown = $process.Id }
+                    # Zavolaná brána běžela už před kliknutím, nově otevřená vznikla až po něm.
+                    if ($process.Id -ne $PID -and $process.MainWindowHandle -ne [IntPtr]::Zero -and
+                        ($process.Id -eq $handoff.Tag.Called -or $process.StartTime -ge $handoff.Tag.Since)) { $shown = $process.Id }
                 }
                 catch { }   # Proces mezitím skončil nebo k němu není přístup.
                 finally { $process.Dispose() }
             }
-            if (-not $shown -and [DateTime]::Now -lt $handoff.Tag.AddSeconds(20)) { return }
+            if (-not $shown -and [DateTime]::Now -lt $handoff.Tag.Since.AddSeconds(20)) { return }
             $handoff.Stop()
             # Když se brána neukázala, Měšec zůstane otevřený, ať člověk neskončí bez okna.
             if (-not $shown) { return }
@@ -382,10 +396,19 @@ try {
             $button.Visibility = 'Visible'
             $button.Add_Click({
                 if ($handoff.IsEnabled) { return }
-                $handoff.Tag = [DateTime]::Now
-                # conhost --headless spustí PowerShell bez okna konzole, stejně jako zástupce.
-                Start-Process -FilePath "$env:SystemRoot\System32\conhost.exe" -WorkingDirectory (Split-Path $gateway) `
-                    -ArgumentList "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$gateway`""
+                $handoff.Tag = @{ Since = [DateTime]::Now; Called = 0 }
+                # Brána od verze 1.5.0 se za Měšcem nezavírá, jen se schová a čeká na událost Branocesta.<PID>.
+                # Stačí ji zavolat a je zpátky hned, protože se nic nestartuje.
+                try {
+                    $signal = [Threading.EventWaitHandle]::OpenExisting("Branocesta.$env:BRANOCESTA_PID")
+                    if ($signal.Set()) { $handoff.Tag.Called = [int]$env:BRANOCESTA_PID }
+                    $signal.Dispose()
+                } catch { }   # Událost není: brána je starší nebo už neběží.
+                if (-not $handoff.Tag.Called) {
+                    # conhost --headless spustí PowerShell bez okna konzole, stejně jako zástupce.
+                    Start-Process -FilePath "$env:SystemRoot\System32\conhost.exe" -WorkingDirectory (Split-Path $gateway) `
+                        -ArgumentList "--headless powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$gateway`""
+                }
                 $handoff.Start()
             })
         }
