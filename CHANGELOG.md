@@ -3,6 +3,34 @@
 Všechny podstatné změny v projektu. Formát vychází z [Keep a Changelog](https://keepachangelog.com/cs/1.1.0/),
 verze se řídí [sémantickým verzováním](https://semver.org/lang/cs/).
 
+## [2.0.0] - 2026-10-07
+
+Měšec teď eviduje jen pravidelné platby. Odškrtávání zaplacených a jednorázové položky končí, proto nová
+hlavní verze.
+
+### Přidáno
+
+- **Platí do**: platba běží každý měsíc bez omezení, nebo jen do měsíce a roku, který jí zvolíš. V rozpisu
+  je pak u ní třeba „do července 2027“ a v posledním měsíci „naposledy“.
+- Smazání jen pro jeden měsíc. **Smazat** se zeptá: **Jen tenhle měsíc** platbu jednou vynechá a příště je
+  zase na místě, **I všechny další** ji ukončí od zobrazeného měsíce dál.
+- Vybírátka místo psaní. Den v měsíci, měsíc i rok se volí kliknutím; u roku stačí šipku podržet a roky
+  běží samy.
+- Kliknutí na název měsíce v záhlaví otevře vybírátko měsíce a roku, kterým přeskočíš rovnou kamkoli.
+
+### Změněno
+
+- Úprava platby platí od zobrazeného měsíce pro všechny další měsíce, tedy i pro ty, kde už platba měla
+  pozdější změnu. Starší měsíce zůstávají, jak byly.
+- Pole **Kam to jde** se jmenuje **Příjemce** a **Den splatnosti** je **Den v měsíci**.
+
+### Odebráno
+
+- Odškrtávání zaplacených plateb, dlaždice **Ještě zaplatit** a zvýraznění plateb po splatnosti.
+- Jednorázové položky. Ty, které v datech už máš, zůstanou jako platby, které končí ve svém měsíci.
+- Zaškrtnutí „zaplaceno“ ze starších verzí se při prvním uložení zahodí a nejde vrátit. Kdo o ně nechce
+  přijít, udělá si ještě ve staré verzi **Zálohu**; i se zaškrtnutími ji otevře jen verze 1.x.
+
 ## [1.2.0] - 2026-10-07
 
 ### Přidáno
@@ -73,6 +101,7 @@ První vydání.
   Smart App Control.
 - Test `tests/test.ps1`, který zkouší šifrování, počítání po měsících a projde okno.
 
+[2.0.0]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v2.0.0
 [1.2.0]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.2.0
 [1.1.0]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.1.0
 [1.0.2]: https://github.com/JohnyLeeJohnes/mesec/releases/tag/v1.0.2
